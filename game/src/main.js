@@ -12,6 +12,7 @@ import { buildPersonMesh, createPlayer, movePlayer, createPedestrians, createThu
 import { createMissions } from './missions.js';
 import { createHud, buildHudDom } from './hud.js';
 import { createInput, ACTION_INTERACT, ACTION_PUNCH, ACTION_PAUSE, ACTION_RESTART, ACTION_MUTE, ACTION_FIRE } from './input.js';
+import { createCollectibles, updateCollectibles } from './collectibles.js';
 
 const STEP = 1 / 60;
 const MAX_FRAME = 0.25;
@@ -82,6 +83,7 @@ const peds = createPedestrians(scene, rng, colliders);
 const thugs = createThugs(scene, rng);
 const player = createPlayer(scene, -170, -170);
 const input = createInput(canvas);
+const collectibles = createCollectibles(scene, rng, colliders);
 
 // ---- game state ----
 let screen = 'title'; // title | playing | paused | end
@@ -955,6 +957,13 @@ function update(dt) {
 
   // --- HUD ---
   hud.setHealth(player.health, CONFIG.playerHealth);
+  updateCollectibles(collectibles, new THREE.Vector3(player.x, 0, player.z), (count, total) => {
+    money += 100;
+    hud.setMoney(money);
+    hud.setPackages(count, total);
+    hud.message(`COLLECTIBLE SECURED  +$100  (${count}/${total})`, 2200);
+    audio.pickup?.();
+  });
   hud.setObjective(missions.objectiveText(), missionTargetPos() ? Math.hypot(player.x - missionTargetPos().x, player.z - missionTargetPos().z) : null);
   hud.setSpeed(inCar && playerCar ? Math.abs(playerCar.speed) * 3.6 : 0, inCar);
   hud.setMission(missions.current(), missions.phase, missions.completed);
@@ -1114,7 +1123,7 @@ function clearShotTrafficLane(car) {
 function stageShot(name) {
   // Every shot runs the real game from a staged position, then flags ready.
   const readyIn = (seconds) => { shotReadyAt = elapsed + seconds; };
-  const chaseHeliOffset = { forward: 32, side: -10, height: 8.2 };
+  const chaseHeliOffset = { forward: 28, side: -18, height: 12.5 };
   if (name === 'start') {
     hud.showTitle(null);
     screen = 'title';

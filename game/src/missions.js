@@ -1,81 +1,71 @@
-// Missions: Vera Kline's three jobs. Each has a briefing, a pickup leg and
-// a return leg, an objective marker, a reward and a fail state. The machine
-// is deliberately small: go to the beacon, press E, go to the next beacon.
-
 import { MISSIONS } from './config.js';
 
 export function createMissions(onEvent) {
-  let index = 0; // 0-based into MISSIONS
-  let phase = 'idle'; // idle | pickup | deliver | done
-  let completed = 0;
-  let failed = false;
+  let activeIndex = 0;
+  let stage = 'idle';
+  let jobsCleared = 0;
+  let hasFailed = false;
 
-  function current() {
-    return MISSIONS[index] || null;
-  }
+  const current = () => MISSIONS[activeIndex] || null;
 
   function target() {
-    const m = current();
-    if (!m) return null;
-    if (phase === 'pickup') return m.pickup || m.targetCar || null;
-    if (phase === 'deliver') return m.dropoff;
-    return null;
+    const mission = current();
+    if (!mission) return null;
+    if (stage === 'pickup') return mission.pickup || mission.targetCar || null;
+    return stage === 'deliver' ? mission.dropoff : null;
   }
 
   function objectiveText() {
-    const m = current();
-    if (!m) return '';
-    if (phase === 'pickup') return m.objective;
-    if (phase === 'deliver') return m.returnObjective;
-    return '';
+    const mission = current();
+    if (!mission) return '';
+    if (stage === 'pickup') return mission.objective;
+    return stage === 'deliver' ? mission.returnObjective : '';
   }
 
-  function startMission(i, saved) {
-    index = i;
-    completed = saved || 0;
-    failed = false;
-    const m = current();
-    if (!m) {
-      phase = 'done';
+  function startMission(index, previousCount) {
+    activeIndex = index;
+    jobsCleared = previousCount || 0;
+    hasFailed = false;
+    const mission = current();
+    if (!mission) {
+      stage = 'done';
       return null;
     }
-    phase = m.pickup || m.targetCar ? 'pickup' : 'deliver';
-    onEvent({ type: 'briefing', mission: m });
-    return m;
+    stage = mission.pickup || mission.targetCar ? 'pickup' : 'deliver';
+    onEvent({ type: 'briefing', mission });
+    return mission;
   }
 
   function startNext() {
-    if (index + 1 >= MISSIONS.length) {
-      phase = 'done';
+    if (activeIndex + 1 >= MISSIONS.length) {
+      stage = 'done';
       onEvent({ type: 'story-done' });
       return null;
     }
-    return startMission(index + 1, completed);
+    return startMission(activeIndex + 1, jobsCleared);
   }
 
-  // The player reached the current beacon and pressed E.
   function arrive() {
-    const m = current();
-    if (!m || phase === 'idle' || phase === 'done') return null;
-    if (phase === 'pickup') {
-      phase = 'deliver';
-      onEvent({ type: 'picked-up', mission: m });
+    const mission = current();
+    if (!mission || stage === 'idle' || stage === 'done') return null;
+    if (stage === 'pickup') {
+      stage = 'deliver';
+      onEvent({ type: 'picked-up', mission });
       return { advanced: true };
     }
-    // Delivered: pay out and move on.
-    completed += 1;
-    onEvent({ type: 'delivered', mission: m, reward: m.reward });
-    return { delivered: true, reward: m.reward };
+    jobsCleared += 1;
+    onEvent({ type: 'delivered', mission, reward: mission.reward });
+    return { delivered: true, reward: mission.reward };
   }
 
   function fail(reason) {
-    if (failed) return;
-    failed = true;
+    if (hasFailed) return;
+    hasFailed = true;
     onEvent({ type: 'failed', mission: current(), reason });
   }
 
   function resetFailed() {
-    failed = false;
+    hasFailed = false;
   }
 
   return {
@@ -87,11 +77,11 @@ export function createMissions(onEvent) {
     current,
     target,
     objectiveText,
-    get phase() { return phase; },
-    get index() { return index; },
-    get completed() { return completed; },
-    get failed() { return failed; },
-    get done() { return phase === 'done'; },
-    setCompleted(n) { completed = n; },
+    get phase() { return stage; },
+    get index() { return activeIndex; },
+    get completed() { return jobsCleared; },
+    get failed() { return hasFailed; },
+    get done() { return stage === 'done'; },
+    setCompleted(value) { jobsCleared = value; },
   };
 }
