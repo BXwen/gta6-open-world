@@ -134,7 +134,7 @@ export function driveCar(car, input, dt, colliders, onCrash) {
     if (car.speed > 0.35) car.speed = Math.max(0, car.speed - CONFIG.carBrake * step);
     else car.speed = Math.max(-CONFIG.carMaxReverse, car.speed - CONFIG.carReverse * step);
   } else {
-    const drag = CONFIG.carBrake * 0.035 * step;
+    const drag = 6 * step;
     car.speed = Math.abs(car.speed) <= drag ? 0 : car.speed - Math.sign(car.speed) * drag;
   }
   car.heading += input.steer * Math.min(1, Math.abs(car.speed) / 7) * step * 1.15 * (car.speed < 0 ? -1 : 1);

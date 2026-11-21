@@ -397,7 +397,7 @@ function throwPunch() {
   sound.punch();
   const contacts = meleeHit(hero, hero.heading, 2.4, [...crowd.peds, ...gang.thugs]);
   const victims = Array.isArray(contacts) ? contacts : contacts ? [contacts] : [];
-  for (const person of victims) woundTarget(person, 25);
+  for (const hit of victims) woundTarget(hit.target, 25);
   if (!victims.length) scatter({ x: hero.x + Math.sin(hero.heading) * 2, y: 1, z: hero.z + Math.cos(hero.heading) * 2 }, 0xbdbdb5, 4, 2);
 }
 function firePistol() {
@@ -607,6 +607,12 @@ function advanceSimulation(delta) {
       scatter(person, 0xb52f2f, 9);
     }
     for (const other of motorists.cars) if (Math.abs(ride.speed) > 8 && distance(ride, other) < 3.4) {
+      const dx = ride.x - other.x;
+      const dz = ride.z - other.z;
+      const gap = Math.hypot(dx, dz);
+      const push = (3.4 - gap) * 0.5 / (gap || 1);
+      ride.x += gap ? dx * push : 1.7;
+      ride.z += dz * push;
       ride.speed *= 0.7;
       sound.crash();
       scatter(ride, 0xffcc65, 8, 5);
