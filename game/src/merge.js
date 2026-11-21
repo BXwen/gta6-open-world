@@ -1,62 +1,68 @@
-// Geometry helpers for Solmar Bay: merge static boxes/cylinders/cones into a
-// few draw calls, and apply transforms to geometries before merging.
-// Written for this game; no outside code.
+// Geometry assembly helpers shared by the world and vehicle renderers.
+import * as Three from '../vendor/three.module.min.js';
 
-import * as THREE from '../vendor/three.module.min.js';
-
-// Concatenate indexed geometries that share position/normal/uv attributes
-// (Box, Cylinder, Cone, Sphere, Plane all qualify). Returns one geometry.
 export function mergeGeometries(geoms) {
-  let vCount = 0;
-  let iCount = 0;
-  for (const g of geoms) {
-    vCount += g.attributes.position.count;
-    iCount += g.index ? g.index.count : 0;
-  }
-  const pos = new Float32Array(vCount * 3);
-  const nor = new Float32Array(vCount * 3);
-  const uv = new Float32Array(vCount * 2);
-  const idx = new Uint32Array(iCount);
-  let vo = 0;
-  let io = 0;
-  for (const g of geoms) {
-    const p = g.attributes.position.array;
-    const n = g.attributes.normal.array;
-    const u = g.attributes.uv.array;
-    pos.set(p, vo * 3);
-    nor.set(n, vo * 3);
-    uv.set(u, vo * 2);
-    if (g.index) {
-      const gi = g.index.array;
-      for (let i = 0; i < gi.length; i += 1) idx[io + i] = gi[i] + vo;
-      io += gi.length;
+  const vertexTotal = geoms.reduce((sum, item) => sum + item.attributes.position.count, 0);
+  const triangleTotal = geoms.reduce((sum, item) => sum + (item.index ? item.index.count : item.attributes.position.count), 0);
+  const positions = new Float32Array(vertexTotal * 3);
+  const normals = new Float32Array(vertexTotal * 3);
+  const textureCoords = new Float32Array(vertexTotal * 2);
+  const indices = new Uint32Array(triangleTotal);
+  let vertexBase = 0;
+  let indexBase = 0;
+
+  for (const geometry of geoms) {
+    const positionAttr = geometry.attributes.position;
+    const normalAttr = geometry.attributes.normal;
+    const uvAttr = geometry.attributes.uv;
+    const vertices = positionAttr.count;
+    positions.set(positionAttr.array, vertexBase * 3);
+    normals.set(normalAttr.array, vertexBase * 3);
+    textureCoords.set(uvAttr.array, vertexBase * 2);
+
+    if (geometry.index) {
+      const sourceIndex = geometry.index.array;
+      for (let cursor = 0; cursor < sourceIndex.length; cursor += 1) {
+        indices[indexBase + cursor] = vertexBase + sourceIndex[cursor];
+      }
+      indexBase += sourceIndex.length;
+    } else {
+      for (let cursor = 0; cursor < vertices; cursor += 1) {
+        indices[indexBase + cursor] = vertexBase + cursor;
+      }
+      indexBase += vertices;
     }
-    vo += g.attributes.position.count;
+    vertexBase += vertices;
   }
-  const out = new THREE.BufferGeometry();
-  out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  out.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
-  out.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
-  out.setIndex(new THREE.BufferAttribute(idx, 1));
-  return out;
+
+  const merged = new Three.BufferGeometry();
+  merged.setAttribute('position', new Three.BufferAttribute(positions, 3));
+  merged.setAttribute('normal', new Three.BufferAttribute(normals, 3));
+  merged.setAttribute('uv', new Three.BufferAttribute(textureCoords, 2));
+  merged.setIndex(new Three.BufferAttribute(indices, 1));
+  return merged;
 }
 
-// Apply a transform to a geometry in place (same compose as a mesh:
-// translate, rotate (Euler XYZ), scale). Returns the geometry.
 export function xform(geo, px, py, pz, rx = 0, ry = 0, rz = 0, sx = 1, sy = 1, sz = 1) {
-  const m = new THREE.Matrix4();
-  const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz));
-  m.compose(new THREE.Vector3(px, py, pz), q, new THREE.Vector3(sx, sy, sz));
-  geo.applyMatrix4(m);
-  return geo;
+  const rotation = new Three.Euler(rx, ry, rz);
+  const orientation = new Three.Quaternion().setFromEuler(rotation);
+  const offset = new Three.Vector3(px, py, pz);
+  const dimensions = new Three.Vector3(sx, sy, sz);
+  return geo.applyMatrix4(new Three.Matrix4().compose(offset, orientation, dimensions));
 }
 
-// Build one mesh from a list of {geo, ...transform} entries sharing one
-// material. Each entry's geometry is cloned, transformed and merged.
 export function mergedMesh(entries, material, opts = {}) {
-  const geoms = entries.map((e) => xform(e.geo.clone(), e.x || 0, e.y || 0, e.z || 0, e.rx || 0, e.ry || 0, e.rz || 0, e.sx || 1, e.sy || 1, e.sz || 1));
-  const mesh = new THREE.Mesh(mergeGeometries(geoms), material);
-  mesh.castShadow = opts.cast === true;
-  mesh.receiveShadow = opts.receive !== false;
-  return mesh;
+  const geometries = [];
+  for (const part of entries) {
+    const copy = part.geo.clone();
+    xform(copy,
+      part.x ?? 0, part.y ?? 0, part.z ?? 0,
+      part.rx ?? 0, part.ry ?? 0, part.rz ?? 0,
+      part.sx ?? 1, part.sy ?? 1, part.sz ?? 1);
+    geometries.push(copy);
+  }
+  const object = new Three.Mesh(mergeGeometries(geometries), material);
+  object.castShadow = opts.cast === true;
+  object.receiveShadow = opts.receive !== false;
+  return object;
 }

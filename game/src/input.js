@@ -50,7 +50,12 @@ export function createInput(canvas) {
     previousX = event.clientX;
     previousY = event.clientY;
     if (!pointerLocked && canvas.requestPointerLock) {
-      try { canvas.requestPointerLock(); } catch { /* Mouse dragging remains available. */ }
+      try {
+        const lockAttempt = canvas.requestPointerLock();
+        if (lockAttempt && typeof lockAttempt.catch === 'function') {
+          lockAttempt.catch(() => { /* Pointer lock unavailable; dragging still works. */ });
+        }
+      } catch { /* Mouse dragging remains available. */ }
     }
   }
 

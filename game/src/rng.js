@@ -1,33 +1,23 @@
-// Seeded random helpers for Solmar Bay. The city layout, traffic and
-// pedestrians all draw from one seed so a screenshot staged with ?seed=1
-// always builds the same town.
+// Repeatable random streams for world generation and lightweight game choices.
 
 export function mulberry32(seed) {
-  let a = seed >>> 0;
-  return function () {
-    a |= 0;
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  let state = seed >>> 0;
+  return () => {
+    state = (state + 0x6d2b79f5) | 0;
+    let bits = Math.imul(state ^ (state >>> 15), 1 | state);
+    bits ^= bits + Math.imul(bits ^ (bits >>> 7), 61 | bits);
+    return ((bits ^ (bits >>> 14)) >>> 0) / 4294967296;
   };
 }
 
 export function makeRng(seed) {
-  const next = mulberry32(seed);
+  const draw = mulberry32(seed);
+  const between = (low, high) => low + draw() * (high - low);
   return {
-    next,
-    range(min, max) {
-      return min + next() * (max - min);
-    },
-    int(min, max) {
-      return Math.floor(min + next() * (max - min + 1));
-    },
-    pick(list) {
-      return list[Math.floor(next() * list.length)];
-    },
-    chance(p) {
-      return next() < p;
-    },
+    next: draw,
+    range: between,
+    int: (low, high) => Math.floor(between(low, high + 1)),
+    pick: (items) => items[Math.floor(draw() * items.length)],
+    chance: (probability) => draw() < probability,
   };
 }
