@@ -1,68 +1,49 @@
-// Geometry assembly helpers shared by the world and vehicle renderers.
-import * as Three from '../vendor/three.module.min.js';
-
+import * as Engine from "../vendor/three.module.min.js";
 export function mergeGeometries(geoms) {
-  const vertexTotal = geoms.reduce((sum, item) => sum + item.attributes.position.count, 0);
-  const triangleTotal = geoms.reduce((sum, item) => sum + (item.index ? item.index.count : item.attributes.position.count), 0);
-  const positions = new Float32Array(vertexTotal * 3);
-  const normals = new Float32Array(vertexTotal * 3);
-  const textureCoords = new Float32Array(vertexTotal * 2);
-  const indices = new Uint32Array(triangleTotal);
-  let vertexBase = 0;
-  let indexBase = 0;
-
-  for (const geometry of geoms) {
-    const positionAttr = geometry.attributes.position;
-    const normalAttr = geometry.attributes.normal;
-    const uvAttr = geometry.attributes.uv;
-    const vertices = positionAttr.count;
-    positions.set(positionAttr.array, vertexBase * 3);
-    normals.set(normalAttr.array, vertexBase * 3);
-    textureCoords.set(uvAttr.array, vertexBase * 2);
-
-    if (geometry.index) {
-      const sourceIndex = geometry.index.array;
-      for (let cursor = 0; cursor < sourceIndex.length; cursor += 1) {
-        indices[indexBase + cursor] = vertexBase + sourceIndex[cursor];
+  const pieces = geoms.map((source) => source.index ? source.toNonIndexed() : source.clone());
+  const output = new Engine.BufferGeometry();
+  const widths = { position: 3, normal: 3, uv: 2 };
+  const vertexCount = pieces.reduce((total, geometry) => total + geometry.getAttribute("position").count, 0);
+  for (const [key, width] of Object.entries(widths)) {
+    if (key !== "position" && !pieces.some((geometry) => geometry.hasAttribute(key))) continue;
+    const merged = new Float32Array(vertexCount * width);
+    let start = 0;
+    for (const geometry of pieces) {
+      const count = geometry.getAttribute("position").count;
+      const source = geometry.getAttribute(key);
+      if (source) {
+        for (let vertex = 0; vertex < count; vertex++) {
+          for (let axis = 0; axis < width; axis++) merged[start + vertex * width + axis] = source.getComponent(vertex, axis);
+        }
       }
-      indexBase += sourceIndex.length;
-    } else {
-      for (let cursor = 0; cursor < vertices; cursor += 1) {
-        indices[indexBase + cursor] = vertexBase + cursor;
-      }
-      indexBase += vertices;
+      start += count * width;
     }
-    vertexBase += vertices;
+    output.setAttribute(key, new Engine.BufferAttribute(merged, width));
   }
-
-  const merged = new Three.BufferGeometry();
-  merged.setAttribute('position', new Three.BufferAttribute(positions, 3));
-  merged.setAttribute('normal', new Three.BufferAttribute(normals, 3));
-  merged.setAttribute('uv', new Three.BufferAttribute(textureCoords, 2));
-  merged.setIndex(new Three.BufferAttribute(indices, 1));
-  return merged;
+  pieces.forEach((geometry) => geometry.dispose());
+  return output;
 }
-
 export function xform(geo, px, py, pz, rx = 0, ry = 0, rz = 0, sx = 1, sy = 1, sz = 1) {
-  const rotation = new Three.Euler(rx, ry, rz);
-  const orientation = new Three.Quaternion().setFromEuler(rotation);
-  const offset = new Three.Vector3(px, py, pz);
-  const dimensions = new Three.Vector3(sx, sy, sz);
-  return geo.applyMatrix4(new Three.Matrix4().compose(offset, orientation, dimensions));
+  const place = new Engine.Vector3(px, py, pz);
+  const orient = new Engine.Quaternion().setFromEuler(new Engine.Euler(rx, ry, rz, "XYZ"));
+  const size = new Engine.Vector3(sx, sy, sz);
+  return geo.applyMatrix4(new Engine.Matrix4().compose(place, orient, size));
 }
-
+function triple(value, fallback) {
+  if (value == null) return fallback;
+  if (Array.isArray(value)) return [value[0] ?? fallback[0], value[1] ?? fallback[1], value[2] ?? fallback[2]];
+  return [value.x ?? fallback[0], value.y ?? fallback[1], value.z ?? fallback[2]];
+}
 export function mergedMesh(entries, material, opts = {}) {
-  const geometries = [];
-  for (const part of entries) {
-    const copy = part.geo.clone();
-    xform(copy,
-      part.x ?? 0, part.y ?? 0, part.z ?? 0,
-      part.rx ?? 0, part.ry ?? 0, part.rz ?? 0,
-      part.sx ?? 1, part.sy ?? 1, part.sz ?? 1);
-    geometries.push(copy);
-  }
-  const object = new Three.Mesh(mergeGeometries(geometries), material);
-  object.castShadow = opts.cast === true;
-  object.receiveShadow = opts.receive !== false;
-  return object;
+  const prepared = entries.map((entry) => {
+    const position = triple(entry.position, [entry.x ?? 0, entry.y ?? 0, entry.z ?? 0]);
+    const rotation = triple(entry.rotation, [entry.rx ?? 0, entry.ry ?? 0, entry.rz ?? 0]);
+    const scale = triple(entry.scale, [entry.sx ?? 1, entry.sy ?? 1, entry.sz ?? 1]);
+    return xform(entry.geo.clone(), ...position, ...rotation, ...scale);
+  });
+  const mesh = new Engine.Mesh(mergeGeometries(prepared), material);
+  prepared.forEach((geometry) => geometry.dispose());
+  mesh.receiveShadow = true;
+  mesh.castShadow = opts.cast === true;
+  return mesh;
 }

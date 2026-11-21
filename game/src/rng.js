@@ -1,23 +1,19 @@
-// Repeatable random streams for world generation and lightweight game choices.
-
 export function mulberry32(seed) {
-  let state = seed >>> 0;
-  return () => {
-    state = (state + 0x6d2b79f5) | 0;
-    let bits = Math.imul(state ^ (state >>> 15), 1 | state);
-    bits ^= bits + Math.imul(bits ^ (bits >>> 7), 61 | bits);
-    return ((bits ^ (bits >>> 14)) >>> 0) / 4294967296;
+  let counter = seed >>> 0;
+  return function () {
+    counter = (1831565813 + counter) >>> 0;
+    let word = Math.imul(counter ^ (counter >>> 15), counter | 1);
+    word ^= word + Math.imul(word ^ (word >>> 7), word | 61);
+    return ((word ^ (word >>> 14)) >>> 0) / 4294967296;
   };
 }
-
 export function makeRng(seed) {
   const draw = mulberry32(seed);
-  const between = (low, high) => low + draw() * (high - low);
   return {
     next: draw,
-    range: between,
-    int: (low, high) => Math.floor(between(low, high + 1)),
-    pick: (items) => items[Math.floor(draw() * items.length)],
-    chance: (probability) => draw() < probability,
+    range: (minimum, maximum) => minimum + (maximum - minimum) * draw(),
+    int: (minimum, maximum) => minimum + Math.floor(draw() * (1 + maximum - minimum)),
+    pick: (items) => items[Math.floor(items.length * draw())],
+    chance: (probability) => draw() < probability
   };
 }
