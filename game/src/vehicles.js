@@ -18,18 +18,49 @@ const BODY_GEO = mergeGeometries([
   xform(new THREE.BoxGeometry(2.02, 0.16, 0.18), 0, 0.53, 2.16),
   xform(new THREE.BoxGeometry(2.02, 0.16, 0.18), 0, 0.53, -2.16),
 ]);
-const CABIN_GEO = mergeGeometries([
-  // Dark roof glazing stays neutral under the warm sunset light.
-  xform(new THREE.BoxGeometry(1.08, 0.18, 1.48), 0, 1.49, -0.28),
-  // Full-height front and rear panes close the gaps that exposed the warm
-  // body shell in the chase framing.
-  xform(new THREE.BoxGeometry(1.48, 0.9, 0.07), 0, 1.25, 0.57, -0.28),
-  xform(new THREE.BoxGeometry(1.48, 0.9, 0.07), 0, 1.25, -1.12, 0.28),
-  // Continuous side glazing closes the gaps that let the sunlit body color
-  // show through around the cabin and keeps the whole window band dark.
-  xform(new THREE.BoxGeometry(0.07, 0.9, 1.48), -0.72, 1.25, -0.28),
-  xform(new THREE.BoxGeometry(0.07, 0.9, 1.48), 0.72, 1.25, -0.28),
-]);
+// Taper each pane before positioning it: the beltline stays wide while the
+// roof edge pulls inward. Recompute normals after changing the box vertices.
+function cabinPane(width, height, depth, topWidth = 1, topDepth = 1) {
+  const geo = new THREE.BoxGeometry(width, height, depth);
+  const positions = geo.attributes.position;
+  for (let i = 0; i < positions.count; i += 1) {
+    const t = positions.getY(i) / height + 0.5;
+    positions.setXYZ(i,
+      positions.getX(i) * (1 + (topWidth - 1) * t),
+      positions.getY(i),
+      positions.getZ(i) * (1 + (topDepth - 1) * t));
+  }
+  geo.computeVertexNormals();
+  return geo;
+}
+const CABIN_RAKE = 25 * Math.PI / 180;
+const CABIN_PARTS = [
+  // Two thin roof facets form a shallow crown, only about 1.20 wide.
+  { geo: xform(new THREE.BoxGeometry(0.62, 0.06, 1.38), -0.29, 1.51, -0.24, 0, 0, 0.08), color: 0x26343c },
+  { geo: xform(new THREE.BoxGeometry(0.62, 0.06, 1.38), 0.29, 1.51, -0.24, 0, 0, -0.08), color: 0x2d3c45 },
+  // Raked screens: beltline z ~= +0.72/-1.20; roof z ~= +0.43/-0.91.
+  { geo: xform(cabinPane(1.48, 0.70, 0.06, 1.20 / 1.48), 0, 1.18, 0.575, -CABIN_RAKE), color: 0x30414b },
+  { geo: xform(cabinPane(1.48, 0.70, 0.06, 1.20 / 1.48), 0, 1.18, -1.055, CABIN_RAKE), color: 0x293941 },
+  // Inward-leaning sides shorten toward the roof to meet both raked screens.
+  { geo: xform(cabinPane(0.06, 0.65, 1.92, 1, 0.70), -0.665, 1.18, -0.24, 0, 0, -0.22), color: 0x22313a },
+  { geo: xform(cabinPane(0.06, 0.65, 1.92, 1, 0.70), 0.665, 1.18, -0.24, 0, 0, 0.22), color: 0x2b3c46 },
+  // Fixed reflection cue, just outside the upper windscreen; merged, not a
+  // separate mesh/material, so the player and instanced fleet keep one draw.
+  { geo: xform(new THREE.BoxGeometry(0.94, 0.035, 0.008), 0, 1.39, 0.514, -CABIN_RAKE), color: 0x91a8b5 },
+];
+const CABIN_GEO = mergeGeometries(CABIN_PARTS.map(({ geo }) => geo));
+// mergeGeometries copies position/normal/uv only; attach the pane colors after
+// merging, in the same vertex order, to retain a single shared glass material.
+const cabinColors = new Float32Array(CABIN_GEO.attributes.position.count * 3);
+let cabinColorOffset = 0;
+for (const { geo, color } of CABIN_PARTS) {
+  const tint = new THREE.Color(color);
+  for (let i = 0; i < geo.attributes.position.count; i += 1) {
+    tint.toArray(cabinColors, cabinColorOffset);
+    cabinColorOffset += 3;
+  }
+}
+CABIN_GEO.setAttribute('color', new THREE.BufferAttribute(cabinColors, 3));
 const LIGHTS_GEO = mergeGeometries([
   xform(new THREE.BoxGeometry(0.42, 0.16, 0.08), -0.62, 0.66, 2.22),
   xform(new THREE.BoxGeometry(0.42, 0.16, 0.08), 0.62, 0.66, 2.22),
@@ -65,7 +96,9 @@ const LIGHTBAR_RED_GEO = xform(new THREE.BoxGeometry(0.55, 0.2, 0.45), -0.3, 1.5
 const LIGHTBAR_BLUE_GEO = xform(new THREE.BoxGeometry(0.55, 0.2, 0.45), 0.3, 1.56, -0.25);
 
 const WHEEL_MAT = new THREE.MeshStandardMaterial({ color: 0x14161a, roughness: 0.95 });
-const GLASS_MAT = new THREE.MeshBasicMaterial({ color: 0x111719, fog: false });
+// Opaque, unlit blue-grey vertex colors cannot inherit sunset or body tint.
+// Disable tone mapping too, keeping the painted reflection neutral and stable.
+const GLASS_MAT = new THREE.MeshBasicMaterial({ color: 0xffffff, vertexColors: true, fog: false, toneMapped: false });
 const LIGHT_MAT = new THREE.MeshStandardMaterial({ color: 0xfff6c8, emissive: 0xffe9a0, emissiveIntensity: 0.8 });
 const TAIL_MAT = new THREE.MeshStandardMaterial({ color: 0xc02020, emissive: 0x800000, emissiveIntensity: 0.6 });
 const DARK_MAT = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.5 });
