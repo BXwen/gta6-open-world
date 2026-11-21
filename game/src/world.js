@@ -14,6 +14,8 @@ import { mergeGeometries, xform, mergedMesh } from './merge.js';
 const STREET_CENTERS = [-186, -124, -62, 0, 62, 124, 186];
 const BLOCK_CENTERS = [-155, -93, -31, 31, 93, 155];
 
+const cssColor = (color) => `#${color.toString(16).padStart(6, '0')}`;
+
 function facadeTexture(rows, base, rng) {
   const key = `${rows}-${base}`;
   facadeTexture.cache = facadeTexture.cache || new Map();
@@ -22,7 +24,7 @@ function facadeTexture(rows, base, rng) {
   canvas.width = 128;
   canvas.height = 256;
   const g = canvas.getContext('2d');
-  g.fillStyle = `#${base.toString(16).padStart(6, '0')}`;
+  g.fillStyle = cssColor(base);
   g.fillRect(0, 0, 128, 256);
   // Slight vertical shade so the top reads as sunlit and the base as shadow.
   const shade = g.createLinearGradient(0, 0, 0, 256);
@@ -38,13 +40,18 @@ function facadeTexture(rows, base, rng) {
   for (let r = 0; r < rows; r += 1) {
     for (let c = 0; c < cols; c += 1) {
       const lit = rng.next() < 0.45;
-      g.fillStyle = lit ? '#ffe9a8' : '#2c3a48';
-      g.fillRect(
-        marginX + c * cellW + cellW * 0.22,
-        marginY + r * cellH + cellH * 0.24,
-        cellW * 0.56,
-        cellH * 0.52,
-      );
+      const x = marginX + c * cellW + cellW * 0.19;
+      const y = marginY + r * cellH + cellH * 0.21;
+      const w = cellW * 0.62;
+      const h = cellH * 0.58;
+      g.fillStyle = 'rgba(33,44,57,0.55)';
+      g.fillRect(x - 1.5, y - 1, w + 3, h + 2);
+      g.fillStyle = cssColor(lit ? PALETTE.windowLit : PALETTE.windowDark);
+      g.fillRect(x, y, w, h);
+      g.fillStyle = lit ? '#fff4ce' : '#65879e';
+      g.fillRect(x, y, w, h * 0.24);
+      g.fillStyle = 'rgba(255,244,222,0.65)';
+      g.fillRect(x - 2.5, y + h, w + 5, 2);
     }
   }
   const tex = new THREE.CanvasTexture(canvas);
@@ -83,33 +90,30 @@ function groundTexture(rng) {
   const toPx = (v) => (v + 240) * S;
   // Cool mid-tone asphalt gives the cream lane paint and sidewalk edges
   // enough contrast while leaving room for the sunset sheen.
-  g.fillStyle = '#555d61';
+  g.fillStyle = cssColor(PALETTE.asphalt);
   g.fillRect(0, 0, 2048, 2048);
   // Sidewalk blocks.
   for (const bx of BLOCK_CENTERS) {
     for (const bz of BLOCK_CENTERS) {
-      g.fillStyle = '#9a938a';
+      g.fillStyle = cssColor(PALETTE.sidewalk);
       g.fillRect(toPx(bx - 24), toPx(bz - 24), 48 * S, 48 * S);
-      g.fillStyle = '#8a8378';
+      g.fillStyle = '#707981';
       g.fillRect(toPx(bx - 24), toPx(bz - 24), 48 * S, 3);
     }
   }
   // A restrained satin highlight down each avenue suggests worn, slightly
   // reflective asphalt without adding another scene mesh or draw call.
-  g.fillStyle = 'rgba(205,220,222,0.12)';
+  g.fillStyle = 'rgba(144,175,200,0.08)';
   for (const s of STREET_CENTERS) {
     g.fillRect(toPx(-240), toPx(s - 2.1), 480 * S, 4.2 * S);
     g.fillRect(toPx(s - 2.1), toPx(-240), 4.2 * S, 480 * S);
   }
-  // Beach sand on the south edge.
-  g.fillStyle = '#e8d5a2';
-  g.fillRect(0, toPx(CONFIG.beachZ), 2048, 2048 - toPx(CONFIG.beachZ));
   // Lane dashes along every street.
-  g.fillStyle = '#f5ead0';
+  g.fillStyle = cssColor(PALETTE.asphaltLine);
   for (const s of STREET_CENTERS) {
     for (let d = -220; d < 220; d += 16) {
-      g.fillRect(toPx(d), toPx(s) - 1.5, 8 * S, 3);
-      g.fillRect(toPx(s) - 1.5, toPx(d), 3, 8 * S);
+      g.fillRect(toPx(d), toPx(s) - 2.1, 8 * S, 4.2);
+      g.fillRect(toPx(s) - 2.1, toPx(d), 4.2, 8 * S);
     }
   }
   // Stop bars, dark utility covers and fine asphalt repairs make the road
@@ -146,6 +150,9 @@ function groundTexture(rng) {
   g.fillRect(toPx(-24), toPx(-24), 48 * S, 48 * S);
   g.fillStyle = '#c8b8a0';
   g.fillRect(toPx(-24), toPx(-24), 48 * S, 48 * S);
+  // Finish with the beach so road markings cannot extend into the sand.
+  g.fillStyle = cssColor(PALETTE.sand);
+  g.fillRect(0, toPx(CONFIG.beachZ), 2048, 2048 - toPx(CONFIG.beachZ));
   void rng;
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -159,23 +166,24 @@ function skyTexture() {
   canvas.height = 512;
   const g = canvas.getContext('2d');
   const grad = g.createLinearGradient(0, 0, 0, 512);
-  grad.addColorStop(0, '#547b9a');
-  grad.addColorStop(0.22, '#83a9bc');
-  grad.addColorStop(0.43, '#c7c4c1');
-  grad.addColorStop(0.58, '#f2b39a');
-  grad.addColorStop(0.69, '#ffc58c');
-  grad.addColorStop(0.82, '#e88870');
+  grad.addColorStop(0, '#326fb5');
+  grad.addColorStop(0.26, '#4f8fc4');
+  grad.addColorStop(0.445, cssColor(PALETTE.sky));
+  grad.addColorStop(0.485, '#f69e98');
+  grad.addColorStop(0.50, '#ffb36b');
+  grad.addColorStop(0.535, '#ff9a7a');
+  grad.addColorStop(0.65, '#704f68');
   grad.addColorStop(1, '#26384d');
   g.fillStyle = grad;
   g.fillRect(0, 0, 128, 512);
   // Thin sunset cloud bands live in the gradient itself; the separate
   // instanced cloud layer supplies the larger, readable cloud shapes.
   for (let i = 0; i < 13; i += 1) {
-    const y = 205 + (i % 5) * 17 + Math.floor(i / 5) * 9;
+    const y = 219 + (i % 5) * 8 + Math.floor(i / 5) * 4;
     const x = (i * 47) % 128;
     const cloud = g.createLinearGradient(0, y - 9, 0, y + 9);
     cloud.addColorStop(0, 'rgba(255,248,236,0)');
-    cloud.addColorStop(0.5, 'rgba(255,239,225,0.22)');
+    cloud.addColorStop(0.5, 'rgba(255,239,225,0.16)');
     cloud.addColorStop(1, 'rgba(255,248,236,0)');
     g.fillStyle = cloud;
     g.beginPath();
@@ -205,27 +213,44 @@ export function buildWorld(scene, rng) {
   // Golden-hour sky dome: a big gradient sphere, unlit, no fog.
   const sky = new THREE.Mesh(
     new THREE.SphereGeometry(700, 24, 16),
-    new THREE.MeshBasicMaterial({ map: skyTexture(), side: THREE.BackSide, fog: false }),
+    new THREE.MeshBasicMaterial({ map: skyTexture(), side: THREE.BackSide, fog: false, toneMapped: false }),
   );
   group.add(sky);
 
   // Distant skyline: hazy silhouette towers ringing the city, one mesh.
   {
-    const entries = [];
+    const towers = [];
+    const tones = [0xc48e83, 0x9b92b3, 0xb6a2a1, 0x879cb7, 0xb89cae];
     for (let i = 0; i < 26; i += 1) {
       const a = (i / 26) * Math.PI * 2 + rng.range(-0.06, 0.06);
       const r = rng.range(330, 420);
       const w = rng.range(18, 34);
-      const h = rng.range(20, 58);
+      const h = rng.range(16, 63) * (i % 4 === 0 ? 1.22 : 0.88);
       const d = rng.range(18, 30);
-      entries.push({
-        geo: new THREE.BoxGeometry(w, h, d),
-        x: Math.sin(a) * r, y: h / 2 - 2, z: Math.cos(a) * r,
-        ry: rng.range(0, Math.PI),
-      });
+      const x = Math.sin(a) * r;
+      const z = Math.cos(a) * r;
+      const ry = rng.range(0, Math.PI);
+      const color = new THREE.Color(tones[i % tones.length]);
+      towers.push({ geo: xform(new THREE.BoxGeometry(w, h, d), x, h / 2 - 2, z, 0, ry), color });
+      if (i % 3 !== 1) {
+        const step = h * (i % 3 === 0 ? 0.23 : 0.13);
+        towers.push({
+          geo: xform(new THREE.BoxGeometry(w * 0.68, step, d * 0.73), x, h - 2 + step / 2, z, 0, ry),
+          color: color.clone().lerp(new THREE.Color(0xffc3a0), 0.16),
+        });
+      }
     }
-    const skyline = mergedMesh(entries, new THREE.MeshStandardMaterial({ color: 0x9a8fb0, roughness: 1 }));
-    skyline.castShadow = false;
+    const geometry = mergeGeometries(towers.map(({ geo }) => geo));
+    const colors = new Float32Array(geometry.attributes.position.count * 3);
+    let offset = 0;
+    for (const { geo, color } of towers) {
+      for (let i = 0; i < geo.attributes.position.count; i += 1) {
+        color.toArray(colors, offset);
+        offset += 3;
+      }
+    }
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    const skyline = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false }));
     group.add(skyline);
   }
 
@@ -317,10 +342,19 @@ export function buildWorld(scene, rng) {
         const z = Math.max(bz - 24 + d / 2 + 1, Math.min(bz + 24 - d / 2 - 1, oz));
         const color = rng.pick(PALETTE.building);
         const rows = h < 20 ? 5 : 9;
-        buildingMat(color, rows).entries.push({ geo: new THREE.BoxGeometry(w, h, d), x, y: h / 2, z });
+        const facade = buildingMat(color, rows).entries;
+        // Vary the upper floors without changing the footprint or seeded layout.
+        const step = h * (h > 22 ? (Math.abs(bx + bz + i) % 3) * 0.09 : 0);
+        const baseH = h - step;
+        const upperW = step ? w * 0.74 : w;
+        const upperD = step ? d * 0.76 : d;
+        facade.push({ geo: new THREE.BoxGeometry(w, baseH, d), x, y: baseH / 2, z });
+        if (step) {
+          facade.push({ geo: new THREE.BoxGeometry(upperW, step, upperD), x, y: baseH + step / 2, z });
+        }
         // A shallow setback at the roof and occasional street-facing balconies
         // break up the flat block silhouette while staying batched by material.
-        ledgeEntries.push({ geo: new THREE.BoxGeometry(w + 0.9, 0.28, d + 0.9), x, y: h * 0.72, z });
+        ledgeEntries.push({ geo: new THREE.BoxGeometry(w + 0.9, 0.42, d + 0.9), x, y: step ? baseH : h * 0.72, z });
         if (h > 13 && rng.chance(0.48)) {
           for (const side of [-1, 1]) {
             balconyEntries.push({ geo: new THREE.BoxGeometry(w * 0.58, 0.18, 1.45), x, y: Math.min(h - 1.4, 5.4), z: z + side * (d / 2 + 0.7) });
@@ -334,13 +368,13 @@ export function buildWorld(scene, rng) {
             shopGlassEntries.push({ geo: new THREE.BoxGeometry(w * 0.58, 2.5, 0.08), x, y: 1.75, z: z + side * (d / 2 + 0.06) });
             const awningColor = rng.pick([0xc23b2e, 0xe8c832, 0x2e8f8a]);
             if (!awningBuckets.has(awningColor)) awningBuckets.set(awningColor, []);
-            awningBuckets.get(awningColor).push({ geo: new THREE.BoxGeometry(w * 0.68, 0.22, 1.3), x, y: 3.25, z: z + side * (d / 2 + 0.62) });
+            awningBuckets.get(awningColor).push({ geo: new THREE.BoxGeometry(w * 0.68, 0.28, 1.75), x, y: 3.25, z: z + side * (d / 2 + 0.81), rx: side * 0.19 });
           }
         }
         // Roof cap, merged per roof color.
         const roofColor = rng.pick(PALETTE.roof);
         if (!roofBuckets.has(roofColor)) roofBuckets.set(roofColor, []);
-        roofBuckets.get(roofColor).push({ geo: new THREE.BoxGeometry(w + 0.6, 0.8, d + 0.6), x, y: h + 0.4, z });
+        roofBuckets.get(roofColor).push({ geo: new THREE.BoxGeometry(upperW + 0.8, 0.9, upperD + 0.8), x, y: h + 0.45, z });
         // Rooftop clutter: AC box, and on tall towers a water tank + antenna.
         if (rng.chance(0.6)) {
           acEntries.push({ geo: new THREE.BoxGeometry(rng.range(2, 4), rng.range(1.5, 3), rng.range(2, 4)), x: x + rng.range(-w / 4, w / 4), y: h + 1.6, z: z + rng.range(-d / 4, d / 4) });
@@ -685,7 +719,7 @@ export function buildWorld(scene, rng) {
   const clouds = new THREE.InstancedMesh(cloudGeo, cloudMat, 16);
   const cloudPos = [];
   const _m4 = new THREE.Matrix4();
-  const cloudColors = [0xfff1e4, 0xe9f0f1, 0xf4d8ca];
+  const cloudColors = [0xfffaf3, 0xf4f8ff, 0xfff0e6];
   for (let i = 0; i < 16; i += 1) {
     const p = { x: rng.range(-220, 220), y: rng.range(58, 92), z: rng.range(-220, 220) };
     cloudPos.push(p);
@@ -701,14 +735,14 @@ export function buildWorld(scene, rng) {
   // directional light comes from.
   const sun = new THREE.Mesh(
     new THREE.CircleGeometry(15, 24),
-    new THREE.MeshBasicMaterial({ color: 0xffc08a, fog: false, transparent: true, opacity: 0.84, toneMapped: false }),
+    new THREE.MeshBasicMaterial({ color: 0xffcd96, fog: false, transparent: true, opacity: 0.84, toneMapped: false }),
   );
   sun.position.set(15, 120, 300);
   sun.lookAt(0, 0, 0);
   group.add(sun);
 
   // Police helicopter: a simple visual unit circling overhead (posed into
-  // the chase/mission shots by stageShot). Seven meshes; the rotor spins.
+  // the chase/mission shots by stageShot). The rotor spins independently.
   const heli = new THREE.Group();
   const heliMat = new THREE.MeshStandardMaterial({ color: 0xd4d9d7, roughness: 0.82, metalness: 0 });
   const heliBody = new THREE.Mesh(new THREE.BoxGeometry(5.8, 1.8, 2.5), heliMat);
@@ -740,23 +774,26 @@ export function buildWorld(scene, rng) {
   const heliLamp = new THREE.Mesh(new THREE.SphereGeometry(0.28, 8, 6), new THREE.MeshBasicMaterial({ color: 0xfff2c5, toneMapped: false }));
   heliLamp.position.set(0.35, -0.65, 0);
   heli.add(heliLamp);
-  const beamMat = new THREE.MeshBasicMaterial({ color: 0xfff3c8, transparent: true, opacity: 0.2, depthWrite: false, side: THREE.DoubleSide, toneMapped: false });
-  const cone = new THREE.Mesh(new THREE.ConeGeometry(2.3, 14.5, 24, 1, true), beamMat);
-  cone.position.set(0.35, -7.25, 0);
-  cone.rotation.x = 56 * Math.PI / 180;
+  const beamLength = 8.2;
+  const beamTilt = 0.24;
+  const beamAxis = new THREE.Vector3(Math.sin(beamTilt), -Math.cos(beamTilt), 0);
+  const beamCenter = heliLamp.position.clone().addScaledVector(beamAxis, beamLength / 2);
+  const beamMat = new THREE.MeshBasicMaterial({ color: 0xfff3c8, transparent: true, opacity: 0.35, depthWrite: false, side: THREE.DoubleSide, toneMapped: false });
+  const cone = new THREE.Mesh(new THREE.ConeGeometry(3.0, beamLength, 24, 1, true), beamMat);
+  cone.position.copy(beamCenter);
+  cone.rotation.z = beamTilt;
   heli.add(cone);
   const coreBeam = new THREE.Mesh(
-    new THREE.ConeGeometry(1.5, 14.52, 20, 1, true),
-    new THREE.MeshBasicMaterial({ color: 0xfff8df, transparent: true, opacity: 0.18, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }),
+    new THREE.ConeGeometry(1.5, beamLength, 20, 1, true),
+    new THREE.MeshBasicMaterial({ color: 0xfff8df, transparent: true, opacity: 0.30, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }),
   );
-  coreBeam.position.copy(cone.position);
-  coreBeam.position.x += 0.01;
-  coreBeam.rotation.x = cone.rotation.x;
+  coreBeam.position.copy(beamCenter);
+  coreBeam.rotation.z = beamTilt;
   heli.add(coreBeam);
   heliRotor.material.transparent = true;
   heliRotor.material.opacity = 0.42;
   group.add(heli);
-  heli.scale.setScalar(1.0);
+  heli.scale.setScalar(1.2);
   const heliOrbit = { cx: 0, cz: 0, r: 110, h: 55, angle: 0.6, speed: 0.045 };
 
   let heliFollow = null;

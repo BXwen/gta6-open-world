@@ -58,19 +58,25 @@ function cabinPane(width, height, depth, topWidth = 1, topDepth = 1) {
   geo.computeVertexNormals();
   return geo;
 }
-const CABIN_RAKE = 27 * Math.PI / 180;
+const CABIN_RAKE = 34 * Math.PI / 180;
+const GLASS_HEIGHT = 0.52; // About 0.43 m of rise after the rake.
+const GLASS_Y = 1.01;
+const FRONT_GLASS_Z = 0.68;
+const REAR_GLASS_Z = -1.29;
+const GLASS_RUN = GLASS_HEIGHT * Math.sin(CABIN_RAKE);
+const ROOF_Z = (FRONT_GLASS_Z + REAR_GLASS_Z) / 2;
+const ROOF_LENGTH = FRONT_GLASS_Z - REAR_GLASS_Z - GLASS_RUN;
+const windscreenStrip = xform(new THREE.BoxGeometry(0.92, 0.023, 0.012),
+  0, GLASS_Y + 0.15, FRONT_GLASS_Z - 0.15 * Math.tan(CABIN_RAKE) + 0.035, -CABIN_RAKE);
 const CABIN_PARTS = [
-  // A low narrow roof joins the glass at its top edges; the windscreen and
-  // rear glass rake into the hood and deck instead of sitting on a block.
-  { geo: xform(new THREE.BoxGeometry(0.78, 0.055, 1.48), -0.36, 1.43, -0.24, 0, 0, 0.035), color: 0x273943 },
-  { geo: xform(new THREE.BoxGeometry(0.78, 0.055, 1.48), 0.36, 1.43, -0.24, 0, 0, -0.035), color: 0x2a3c45 },
-  { geo: xform(cabinPane(1.54, 0.58, 0.055, 1.25 / 1.54), 0, 1.12, 0.68, -CABIN_RAKE), color: 0x30434d },
-  { geo: xform(cabinPane(1.54, 0.58, 0.055, 1.25 / 1.54), 0, 1.12, -1.17, CABIN_RAKE), color: 0x293a44 },
-  { geo: xform(cabinPane(0.07, 0.56, 2.08, 1, 0.68), -0.76, 1.12, -0.24, 0, 0, -0.24), color: 0x243842 },
-  { geo: xform(cabinPane(0.07, 0.56, 2.08, 1, 0.68), 0.76, 1.12, -0.24, 0, 0, 0.24), color: 0x2b3e48 },
-  // Fixed cool reflection on the upper windscreen, merged into the same
-  // opaque glass mesh to keep the player's car and fleet on one draw each.
-  { geo: xform(new THREE.BoxGeometry(0.92, 0.024, 0.008), 0, 1.34, 0.56, -CABIN_RAKE), color: 0x8299a4 },
+  { geo: xform(new THREE.BoxGeometry(0.66, 0.055, ROOF_LENGTH), -0.30, 1.24, ROOF_Z, 0, 0, 0.035), color: 0x4b6572 },
+  { geo: xform(new THREE.BoxGeometry(0.66, 0.055, ROOF_LENGTH), 0.30, 1.24, ROOF_Z, 0, 0, -0.035), color: 0x536d78 },
+  { geo: xform(cabinPane(1.54, GLASS_HEIGHT, 0.055, 1.25 / 1.54), 0, GLASS_Y, FRONT_GLASS_Z, -CABIN_RAKE), color: 0x85a5b8 },
+  { geo: xform(cabinPane(1.54, GLASS_HEIGHT, 0.055, 1.25 / 1.54), 0, GLASS_Y, REAR_GLASS_Z, CABIN_RAKE), color: 0x8fa8b8 },
+  { geo: xform(cabinPane(0.055, 0.47, FRONT_GLASS_Z - REAR_GLASS_Z + GLASS_RUN, 1, ROOF_LENGTH / (FRONT_GLASS_Z - REAR_GLASS_Z + GLASS_RUN)), -0.697, 0.997, ROOF_Z, 0, 0, -0.31), color: 0x6a8a9c },
+  { geo: xform(cabinPane(0.055, 0.47, FRONT_GLASS_Z - REAR_GLASS_Z + GLASS_RUN, 1, ROOF_LENGTH / (FRONT_GLASS_Z - REAR_GLASS_Z + GLASS_RUN)), 0.697, 0.997, ROOF_Z, 0, 0, 0.31), color: 0x7696a7 },
+  // Keep the cool reflection in the same opaque mesh as the panes.
+  { geo: windscreenStrip, color: 0xb6d8e7 },
 ];
 const CABIN_GEO = mergeGeometries(CABIN_PARTS.map(({ geo }) => geo));
 // mergeGeometries copies position/normal/uv only; attach the pane colors after
@@ -86,8 +92,8 @@ for (const { geo, color } of CABIN_PARTS) {
 }
 CABIN_GEO.setAttribute('color', new THREE.BufferAttribute(cabinColors, 3));
 const DRIVER_GEO = mergeGeometries([
-  xform(new THREE.SphereGeometry(0.23, 10, 8), -0.25, 1.50, 0.03),
-  xform(new THREE.BoxGeometry(0.58, 0.24, 0.28), -0.25, 1.2, 0.03),
+  xform(new THREE.SphereGeometry(0.23, 10, 8), -0.25, 1.31, 0.03),
+  xform(new THREE.BoxGeometry(0.58, 0.24, 0.28), -0.25, 1.03, 0.03),
 ]);
 const LIGHTS_GEO = mergeGeometries([
   xform(new THREE.BoxGeometry(0.48, 0.13, 0.08), -0.62, 0.59, 2.48),
@@ -119,9 +125,9 @@ const POLICE_STRIPE_GEO = mergeGeometries([
   xform(new THREE.BoxGeometry(0.05, 0.09, 1.5), -1.05, 0.7, -0.18),
   xform(new THREE.BoxGeometry(0.05, 0.09, 1.5), 1.05, 0.7, -0.18),
 ]);
-const LIGHTBAR_GEO = xform(new THREE.BoxGeometry(1.25, 0.14, 0.42), 0, 1.50, -0.24);
-const LIGHTBAR_RED_GEO = xform(new THREE.BoxGeometry(0.56, 0.18, 0.38), -0.31, 1.50, -0.24);
-const LIGHTBAR_BLUE_GEO = xform(new THREE.BoxGeometry(0.56, 0.18, 0.38), 0.31, 1.50, -0.24);
+const LIGHTBAR_GEO = xform(new THREE.BoxGeometry(1.25, 0.14, 0.42), 0, 1.32, ROOF_Z);
+const LIGHTBAR_RED_GEO = xform(new THREE.BoxGeometry(0.56, 0.18, 0.38), -0.31, 1.32, ROOF_Z);
+const LIGHTBAR_BLUE_GEO = xform(new THREE.BoxGeometry(0.56, 0.18, 0.38), 0.31, 1.32, ROOF_Z);
 
 const WHEEL_MAT = new THREE.MeshStandardMaterial({ color: 0x14161a, roughness: 0.95 });
 // Opaque, unlit blue-grey vertex colors cannot inherit sunset or body tint.

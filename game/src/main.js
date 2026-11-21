@@ -3,7 +3,7 @@
 // The game moves between title, play, paused and end screens.
 
 import * as THREE from '../vendor/three.module.min.js';
-import { CONFIG, MISSIONS, STORY, SAVE_KEY } from './config.js';
+import { CONFIG, MISSIONS, PALETTE, STORY, SAVE_KEY } from './config.js';
 import { makeRng } from './rng.js';
 import { createAudio } from './audio.js';
 import { buildWorld, resolveCircle, clampBounds } from './world.js';
@@ -46,8 +46,8 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.22;
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x2a2a55);
-scene.fog = new THREE.Fog(0xe8a87a, 180, 600);
+scene.background = new THREE.Color(PALETTE.sky);
+scene.fog = new THREE.Fog(PALETTE.fog, 180, 600);
 
 const hemi = new THREE.HemisphereLight(0xffd9b0, 0x9a7a65, 1.45);
 scene.add(hemi);
@@ -1114,6 +1114,7 @@ function clearShotTrafficLane(car) {
 function stageShot(name) {
   // Every shot runs the real game from a staged position, then flags ready.
   const readyIn = (seconds) => { shotReadyAt = elapsed + seconds; };
+  const chaseHeliOffset = { forward: 32, side: -10, height: 8.2 };
   if (name === 'start') {
     hud.showTitle(null);
     screen = 'title';
@@ -1143,7 +1144,7 @@ function stageShot(name) {
     // shot pages, so this angle holds for the screenshot.
     input.setYaw(0.22);
     input.setPitch(0.2);
-    world.followHeli(playerCar, () => input.yaw);
+    world.followHeli(playerCar, () => input.yaw, chaseHeliOffset);
     readyIn(3);
   } else if (name === 'chase') {
     missions.startMission(2, 2); // mission 3: the getaway
@@ -1168,7 +1169,7 @@ function stageShot(name) {
     feed.style.width = '760px';
     hud.message('POLICE 07m  RAMMING  |  POLICE 11m  FLANKING  |  POLICE 14m  ROADBLOCK', 12000, true);
     hud.message('SPOTLIGHT 18m  |  DRIFT x3  |  NEAR MISS +$250', 12000, true);
-    world.followHeli(playerCar, () => input.yaw);
+    world.followHeli(playerCar, () => input.yaw, chaseHeliOffset);
     readyIn(3);
   } else {
     readyIn(2);
