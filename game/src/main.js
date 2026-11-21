@@ -460,6 +460,7 @@ function enterCar(car) {
   if (i >= 0) traffic.cars.splice(i, 1);
   playerCar = createCar(buildCarMesh(car.color), car.x, car.z, car.heading);
   playerCar.color = car.color;
+  playerCar.modelName = isTarget ? MISSIONS[1].targetCar.model : car.isPolice ? 'PD CRUISER' : 'SPORT GT';
   playerCar.isPlayer = true;
   playerCar.health = car.health ?? CONFIG.carHealth;
   inCar = true;
@@ -925,8 +926,8 @@ function update(dt) {
   }
   const yaw = input.yaw;
   const pitch = input.pitch;
-  const dist = inCar ? (shot === 'chase' || shot === 'mission' ? 4.7 : 11) : 7.5;
-  const height = 1.55 + pitch * 3.5;
+  const dist = inCar ? (shot === 'chase' || shot === 'mission' ? 6.5 : 12.5) : 7.5;
+  const height = inCar ? ((shot === 'chase' || shot === 'mission') ? 2.2 + pitch * 4.0 : 2.8 + pitch * 4.0) : 1.55 + pitch * 3.5;
   const cx = focus.x - Math.sin(yaw) * Math.cos(pitch) * dist;
   const cz = focus.z - Math.cos(yaw) * Math.cos(pitch) * dist;
   const cy = focus.y + height;
@@ -956,6 +957,9 @@ function update(dt) {
   hud.setHealth(player.health, CONFIG.playerHealth);
   hud.setObjective(missions.objectiveText(), missionTargetPos() ? Math.hypot(player.x - missionTargetPos().x, player.z - missionTargetPos().z) : null);
   hud.setSpeed(inCar && playerCar ? Math.abs(playerCar.speed) * 3.6 : 0, inCar);
+  hud.setMission(missions.current(), missions.phase, missions.completed);
+  hud.setPoliceResponse(police.cars, { x: player.x, z: player.z, heading: inCar && playerCar ? playerCar.heading : player.heading }, wanted);
+  hud.setVehicleInfo(inCar, inCar && playerCar ? playerCar.modelName : '');
   hud.setCrosshair(!inCar);
   // The minimap is a 2D canvas redraw: 10 Hz is plenty, and it keeps the
   // per-frame DOM/canvas cost off the critical path.
@@ -1021,11 +1025,13 @@ function teleportPlayer(x, z) {
 }
 
 function giveCar(color) {
-  const mesh = buildCarMesh(color ?? 0xc23b2e);
+  const paint = color ?? 0xe45132;
+  const mesh = buildCarMesh(paint);
   scene.add(mesh);
   if (playerCar) scene.remove(playerCar.mesh);
   playerCar = createCar(mesh, player.x + 3, player.z, player.heading);
-  playerCar.color = color ?? 0xc23b2e;
+  playerCar.color = paint;
+  playerCar.modelName = missions.current() && missions.current().id === 2 && paint === 0xe8c832 ? MISSIONS[1].targetCar.model : 'SPORT GT';
   playerCar.isPlayer = true;
   inCar = true;
   player.mesh.visible = false;
@@ -1129,7 +1135,7 @@ function stageShot(name) {
     // Driving the yellow Comet GT to the garage puts the hero car out in
     // the open, with the beacon far away at the drop-off.
     giveCar(0xe8c832);
-    teleportPlayer(0, -100);
+    teleportPlayer(0, 105);
     playerCar.heading = 0; // rolling north up Ocean Ave
     playerCar.speed = 22; // ~80 km/h from the first frame
     missions.arrive(); // pickup -> deliver: "Deliver the Comet GT..."
@@ -1141,8 +1147,8 @@ function stageShot(name) {
     readyIn(3);
   } else if (name === 'chase') {
     missions.startMission(2, 2); // mission 3: the getaway
-    giveCar(0xc23b2e);
-    teleportPlayer(0, -150); // 4 s of rolling stops well short of the z=-62 intersection
+    giveCar(0xe45132);
+    teleportPlayer(0, 105); // Coastal Ocean Ave; the moving shot settles near the beach
     playerCar.heading = 0;
     playerCar.speed = 22; // rolling down the street as the chase forms
     input.setYaw(0.22);

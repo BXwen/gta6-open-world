@@ -81,10 +81,9 @@ function groundTexture(rng) {
   const g = canvas.getContext('2d');
   const S = 2048 / 480; // px per world unit, world runs -240..240
   const toPx = (v) => (v + 240) * S;
-  // Asphalt base: a warm light grey, so the road reads as a sunlit
-  // street against the tan sidewalks instead of a dark band. (The old
-  // #3a3f46/#4a4d55 read nearly black in the chase screenshot.)
-  g.fillStyle = '#6b675e';
+  // Cool mid-tone asphalt gives the cream lane paint and sidewalk edges
+  // enough contrast while leaving room for the sunset sheen.
+  g.fillStyle = '#555d61';
   g.fillRect(0, 0, 2048, 2048);
   // Sidewalk blocks.
   for (const bx of BLOCK_CENTERS) {
@@ -95,11 +94,18 @@ function groundTexture(rng) {
       g.fillRect(toPx(bx - 24), toPx(bz - 24), 48 * S, 3);
     }
   }
+  // A restrained satin highlight down each avenue suggests worn, slightly
+  // reflective asphalt without adding another scene mesh or draw call.
+  g.fillStyle = 'rgba(205,220,222,0.12)';
+  for (const s of STREET_CENTERS) {
+    g.fillRect(toPx(-240), toPx(s - 2.1), 480 * S, 4.2 * S);
+    g.fillRect(toPx(s - 2.1), toPx(-240), 4.2 * S, 480 * S);
+  }
   // Beach sand on the south edge.
   g.fillStyle = '#e8d5a2';
   g.fillRect(0, toPx(CONFIG.beachZ), 2048, 2048 - toPx(CONFIG.beachZ));
   // Lane dashes along every street.
-  g.fillStyle = '#d8d2c0';
+  g.fillStyle = '#f5ead0';
   for (const s of STREET_CENTERS) {
     for (let d = -220; d < 220; d += 16) {
       g.fillRect(toPx(d), toPx(s) - 1.5, 8 * S, 3);
@@ -149,17 +155,33 @@ function groundTexture(rng) {
 
 function skyTexture() {
   const canvas = document.createElement('canvas');
-  canvas.width = 16;
-  canvas.height = 256;
+  canvas.width = 128;
+  canvas.height = 512;
   const g = canvas.getContext('2d');
-  const grad = g.createLinearGradient(0, 0, 0, 256);
-    grad.addColorStop(0, '#20204f'); // saturated indigo zenith
-    grad.addColorStop(0.3, '#883c91'); // magenta transition
-    grad.addColorStop(0.5, '#ff7546'); // vivid sunset orange
-    grad.addColorStop(0.62, '#ffad2f'); // golden band
-  grad.addColorStop(1, '#1a1a2e'); // below the horizon, never seen
+  const grad = g.createLinearGradient(0, 0, 0, 512);
+  grad.addColorStop(0, '#547b9a');
+  grad.addColorStop(0.22, '#83a9bc');
+  grad.addColorStop(0.43, '#c7c4c1');
+  grad.addColorStop(0.58, '#f2b39a');
+  grad.addColorStop(0.69, '#ffc58c');
+  grad.addColorStop(0.82, '#e88870');
+  grad.addColorStop(1, '#26384d');
   g.fillStyle = grad;
-  g.fillRect(0, 0, 16, 256);
+  g.fillRect(0, 0, 128, 512);
+  // Thin sunset cloud bands live in the gradient itself; the separate
+  // instanced cloud layer supplies the larger, readable cloud shapes.
+  for (let i = 0; i < 13; i += 1) {
+    const y = 205 + (i % 5) * 17 + Math.floor(i / 5) * 9;
+    const x = (i * 47) % 128;
+    const cloud = g.createLinearGradient(0, y - 9, 0, y + 9);
+    cloud.addColorStop(0, 'rgba(255,248,236,0)');
+    cloud.addColorStop(0.5, 'rgba(255,239,225,0.22)');
+    cloud.addColorStop(1, 'rgba(255,248,236,0)');
+    g.fillStyle = cloud;
+    g.beginPath();
+    g.ellipse(x, y, 28 + (i % 4) * 8, 8 + (i % 3) * 2, 0, 0, Math.PI * 2);
+    g.fill();
+  }
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
@@ -194,7 +216,7 @@ export function buildWorld(scene, rng) {
       const a = (i / 26) * Math.PI * 2 + rng.range(-0.06, 0.06);
       const r = rng.range(330, 420);
       const w = rng.range(18, 34);
-      const h = rng.range(30, 95);
+      const h = rng.range(20, 58);
       const d = rng.range(18, 30);
       entries.push({
         geo: new THREE.BoxGeometry(w, h, d),
@@ -202,7 +224,7 @@ export function buildWorld(scene, rng) {
         ry: rng.range(0, Math.PI),
       });
     }
-    const skyline = mergedMesh(entries, new THREE.MeshStandardMaterial({ color: 0x4a3a5e, roughness: 1 }));
+    const skyline = mergedMesh(entries, new THREE.MeshStandardMaterial({ color: 0x9a8fb0, roughness: 1 }));
     skyline.castShadow = false;
     group.add(skyline);
   }
@@ -653,8 +675,8 @@ export function buildWorld(scene, rng) {
     group.add(mergedMesh(crateEntries, new THREE.MeshStandardMaterial({ color: 0x8a6a42, roughness: 1 })));
   }
 
-  // Clouds: one InstancedMesh of a 3-puff blob, drifting with the wind.
-  const cloudMat = new THREE.MeshStandardMaterial({ color: 0xffd9c0, roughness: 1, transparent: true, opacity: 0.85 });
+  // Clouds: one InstancedMesh of a 4-puff blob, drifting with the wind.
+  const cloudMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, transparent: true, opacity: 0.88 });
   const puffGeos = [];
   for (let j = 0; j < 4; j += 1) {
     puffGeos.push(xform(new THREE.SphereGeometry(rng.range(5, 10), 10, 8), j * 6 - 9, rng.range(-1, 1), rng.range(-2, 2), 0, 0, 0, 1, 0.42, 1));
@@ -663,20 +685,23 @@ export function buildWorld(scene, rng) {
   const clouds = new THREE.InstancedMesh(cloudGeo, cloudMat, 16);
   const cloudPos = [];
   const _m4 = new THREE.Matrix4();
+  const cloudColors = [0xfff1e4, 0xe9f0f1, 0xf4d8ca];
   for (let i = 0; i < 16; i += 1) {
     const p = { x: rng.range(-220, 220), y: rng.range(58, 92), z: rng.range(-220, 220) };
     cloudPos.push(p);
     _m4.makeTranslation(p.x, p.y, p.z);
     clouds.setMatrixAt(i, _m4);
+    clouds.setColorAt(i, new THREE.Color(cloudColors[i % cloudColors.length]));
   }
   clouds.instanceMatrix.needsUpdate = true;
+  if (clouds.instanceColor) clouds.instanceColor.needsUpdate = true;
   group.add(clouds);
 
   // Sun disc in the southern sky, warm and large, roughly where the
   // directional light comes from.
   const sun = new THREE.Mesh(
-    new THREE.CircleGeometry(26, 24),
-    new THREE.MeshBasicMaterial({ color: 0xff9b4d, fog: false }),
+    new THREE.CircleGeometry(15, 24),
+    new THREE.MeshBasicMaterial({ color: 0xffc08a, fog: false, transparent: true, opacity: 0.84, toneMapped: false }),
   );
   sun.position.set(15, 120, 300);
   sun.lookAt(0, 0, 0);
@@ -712,17 +737,26 @@ export function buildWorld(scene, rng) {
   const heliSkidR = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.12, 0.25), heliMat);
   heliSkidR.position.set(0, -1.15, -1.05);
   heli.add(heliSkidR);
-  const heliLamp = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffefb0 }));
-  heliLamp.position.set(2.7, -0.65, 0);
+  const heliLamp = new THREE.Mesh(new THREE.SphereGeometry(0.28, 8, 6), new THREE.MeshBasicMaterial({ color: 0xfff2c5, toneMapped: false }));
+  heliLamp.position.set(0.35, -0.65, 0);
   heli.add(heliLamp);
-  const cone = new THREE.Mesh(new THREE.ConeGeometry(2.8, 5.8, 20, 1, true), new THREE.MeshBasicMaterial({ color: 0xfff0b0, transparent: true, opacity: 0.24, depthWrite: false, side: THREE.DoubleSide }));
-  cone.position.set(2.7, -3.4, 0);
-  cone.scale.set(0.42, 1, 0.42);
+  const beamMat = new THREE.MeshBasicMaterial({ color: 0xfff3c8, transparent: true, opacity: 0.2, depthWrite: false, side: THREE.DoubleSide, toneMapped: false });
+  const cone = new THREE.Mesh(new THREE.ConeGeometry(2.3, 14.5, 24, 1, true), beamMat);
+  cone.position.set(0.35, -7.25, 0);
+  cone.rotation.x = 56 * Math.PI / 180;
   heli.add(cone);
+  const coreBeam = new THREE.Mesh(
+    new THREE.ConeGeometry(1.5, 14.52, 20, 1, true),
+    new THREE.MeshBasicMaterial({ color: 0xfff8df, transparent: true, opacity: 0.18, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }),
+  );
+  coreBeam.position.copy(cone.position);
+  coreBeam.position.x += 0.01;
+  coreBeam.rotation.x = cone.rotation.x;
+  heli.add(coreBeam);
   heliRotor.material.transparent = true;
   heliRotor.material.opacity = 0.42;
   group.add(heli);
-  heli.scale.setScalar(1.45);
+  heli.scale.setScalar(1.0);
   const heliOrbit = { cx: 0, cz: 0, r: 110, h: 55, angle: 0.6, speed: 0.045 };
 
   let heliFollow = null;
@@ -756,9 +790,9 @@ export function buildWorld(scene, rng) {
     followHeli(target, yaw, offset = {}) {
       heliFollow = {
         target, yaw,
-        forward: offset.forward ?? 28,
-        side: offset.side ?? 9,
-        height: offset.height ?? 5.2,
+        forward: offset.forward ?? 12,
+        side: offset.side ?? 0,
+        height: offset.height ?? 8,
       };
     },
     updateHeliFollow() {

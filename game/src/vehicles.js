@@ -11,12 +11,37 @@ import { CONFIG, CAR_COLORS } from './config.js';
 import { resolveCircle, clampBounds } from './world.js';
 import { mergeGeometries, xform } from './merge.js';
 
-// Shared geometries (car-local space, origin at ground centre).
+// Shared geometries (car-local space, origin at ground centre). The body is
+// an extruded side profile: a long bonnet, low beltline and tapered ends.
+const bodyProfile = new THREE.Shape();
+bodyProfile.moveTo(-2.58, 0.34);
+bodyProfile.lineTo(-2.61, 0.52);
+bodyProfile.quadraticCurveTo(-2.57, 0.76, -2.28, 0.82);
+bodyProfile.lineTo(-1.55, 0.80);
+bodyProfile.lineTo(-0.78, 0.73);
+bodyProfile.lineTo(1.20, 0.73);
+bodyProfile.lineTo(2.12, 0.63);
+bodyProfile.quadraticCurveTo(2.53, 0.58, 2.62, 0.40);
+bodyProfile.lineTo(2.58, 0.34);
+bodyProfile.closePath();
+const bodyHull = new THREE.ExtrudeGeometry(bodyProfile, {
+  depth: 1.92,
+  bevelEnabled: true,
+  bevelSegments: 2,
+  steps: 1,
+  bevelSize: 0.045,
+  bevelThickness: 0.035,
+});
+bodyHull.rotateY(-Math.PI / 2);
+bodyHull.translate(0.96, 0, 0);
 const BODY_GEO = mergeGeometries([
-  xform(new THREE.BoxGeometry(1.92, 0.5, 4.25), 0, 0.58, 0),
-  xform(new THREE.BoxGeometry(1.88, 0.24, 1.05), 0, 0.88, 1.55),
-  xform(new THREE.BoxGeometry(2.02, 0.16, 0.18), 0, 0.53, 2.16),
-  xform(new THREE.BoxGeometry(2.02, 0.16, 0.18), 0, 0.53, -2.16),
+  bodyHull,
+  // Hood and deck crown catch a broad paint highlight while following the
+  // low fastback silhouette rather than forming a raised cabin box.
+  xform(new THREE.BoxGeometry(1.72, 0.07, 1.52), 0, 0.75, 1.12, -0.035),
+  xform(new THREE.BoxGeometry(1.72, 0.07, 0.72), 0, 0.79, -1.92, 0.025),
+  xform(new THREE.BoxGeometry(2.0, 0.11, 0.14), 0, 0.48, 2.55),
+  xform(new THREE.BoxGeometry(2.0, 0.11, 0.14), 0, 0.48, -2.55),
 ]);
 // Taper each pane before positioning it: the beltline stays wide while the
 // roof edge pulls inward. Recompute normals after changing the box vertices.
@@ -33,20 +58,19 @@ function cabinPane(width, height, depth, topWidth = 1, topDepth = 1) {
   geo.computeVertexNormals();
   return geo;
 }
-const CABIN_RAKE = 25 * Math.PI / 180;
+const CABIN_RAKE = 27 * Math.PI / 180;
 const CABIN_PARTS = [
-  // Two thin roof facets form a shallow crown, only about 1.20 wide.
-  { geo: xform(new THREE.BoxGeometry(0.62, 0.06, 1.38), -0.29, 1.51, -0.24, 0, 0, 0.08), color: 0x26343c },
-  { geo: xform(new THREE.BoxGeometry(0.62, 0.06, 1.38), 0.29, 1.51, -0.24, 0, 0, -0.08), color: 0x2d3c45 },
-  // Raked screens: beltline z ~= +0.72/-1.20; roof z ~= +0.43/-0.91.
-  { geo: xform(cabinPane(1.48, 0.70, 0.06, 1.20 / 1.48), 0, 1.18, 0.575, -CABIN_RAKE), color: 0x30414b },
-  { geo: xform(cabinPane(1.48, 0.70, 0.06, 1.20 / 1.48), 0, 1.18, -1.055, CABIN_RAKE), color: 0x293941 },
-  // Inward-leaning sides shorten toward the roof to meet both raked screens.
-  { geo: xform(cabinPane(0.06, 0.65, 1.92, 1, 0.70), -0.665, 1.18, -0.24, 0, 0, -0.22), color: 0x22313a },
-  { geo: xform(cabinPane(0.06, 0.65, 1.92, 1, 0.70), 0.665, 1.18, -0.24, 0, 0, 0.22), color: 0x2b3c46 },
-  // Fixed reflection cue, just outside the upper windscreen; merged, not a
-  // separate mesh/material, so the player and instanced fleet keep one draw.
-  { geo: xform(new THREE.BoxGeometry(0.94, 0.035, 0.008), 0, 1.39, 0.514, -CABIN_RAKE), color: 0x91a8b5 },
+  // A low narrow roof joins the glass at its top edges; the windscreen and
+  // rear glass rake into the hood and deck instead of sitting on a block.
+  { geo: xform(new THREE.BoxGeometry(0.78, 0.055, 1.48), -0.36, 1.43, -0.24, 0, 0, 0.035), color: 0x273943 },
+  { geo: xform(new THREE.BoxGeometry(0.78, 0.055, 1.48), 0.36, 1.43, -0.24, 0, 0, -0.035), color: 0x2a3c45 },
+  { geo: xform(cabinPane(1.54, 0.58, 0.055, 1.25 / 1.54), 0, 1.12, 0.68, -CABIN_RAKE), color: 0x30434d },
+  { geo: xform(cabinPane(1.54, 0.58, 0.055, 1.25 / 1.54), 0, 1.12, -1.17, CABIN_RAKE), color: 0x293a44 },
+  { geo: xform(cabinPane(0.07, 0.56, 2.08, 1, 0.68), -0.76, 1.12, -0.24, 0, 0, -0.24), color: 0x243842 },
+  { geo: xform(cabinPane(0.07, 0.56, 2.08, 1, 0.68), 0.76, 1.12, -0.24, 0, 0, 0.24), color: 0x2b3e48 },
+  // Fixed cool reflection on the upper windscreen, merged into the same
+  // opaque glass mesh to keep the player's car and fleet on one draw each.
+  { geo: xform(new THREE.BoxGeometry(0.92, 0.024, 0.008), 0, 1.34, 0.56, -CABIN_RAKE), color: 0x8299a4 },
 ];
 const CABIN_GEO = mergeGeometries(CABIN_PARTS.map(({ geo }) => geo));
 // mergeGeometries copies position/normal/uv only; attach the pane colors after
@@ -61,44 +85,49 @@ for (const { geo, color } of CABIN_PARTS) {
   }
 }
 CABIN_GEO.setAttribute('color', new THREE.BufferAttribute(cabinColors, 3));
+const DRIVER_GEO = mergeGeometries([
+  xform(new THREE.SphereGeometry(0.23, 10, 8), -0.25, 1.50, 0.03),
+  xform(new THREE.BoxGeometry(0.58, 0.24, 0.28), -0.25, 1.2, 0.03),
+]);
 const LIGHTS_GEO = mergeGeometries([
-  xform(new THREE.BoxGeometry(0.42, 0.16, 0.08), -0.62, 0.66, 2.22),
-  xform(new THREE.BoxGeometry(0.42, 0.16, 0.08), 0.62, 0.66, 2.22),
+  xform(new THREE.BoxGeometry(0.48, 0.13, 0.08), -0.62, 0.59, 2.48),
+  xform(new THREE.BoxGeometry(0.48, 0.13, 0.08), 0.62, 0.59, 2.48),
 ]);
 const TAILS_GEO = mergeGeometries([
-  xform(new THREE.BoxGeometry(0.42, 0.16, 0.08), -0.62, 0.66, -2.22),
-  xform(new THREE.BoxGeometry(0.42, 0.16, 0.08), 0.62, 0.66, -2.22),
+  xform(new THREE.BoxGeometry(0.48, 0.13, 0.08), -0.62, 0.64, -2.48),
+  xform(new THREE.BoxGeometry(0.48, 0.13, 0.08), 0.62, 0.64, -2.48),
 ]);
-const GRILLE_GEO = xform(new THREE.BoxGeometry(0.72, 0.22, 0.06), 0, 0.62, 2.18);
+const GRILLE_GEO = xform(new THREE.BoxGeometry(0.78, 0.18, 0.06), 0, 0.53, 2.57);
 const HUB_GEO = new THREE.CylinderGeometry(0.2, 0.2, 0.36, 12);
 HUB_GEO.rotateZ(Math.PI / 2);
 const MIRROR_GEO = mergeGeometries([
-  xform(new THREE.BoxGeometry(0.12, 0.08, 0.18), -0.99, 1.12, 0.3),
-  xform(new THREE.BoxGeometry(0.12, 0.08, 0.18), 0.99, 1.12, 0.3),
+  xform(new THREE.BoxGeometry(0.12, 0.08, 0.18), -1.0, 1.0, 0.30),
+  xform(new THREE.BoxGeometry(0.12, 0.08, 0.18), 1.0, 1.0, 0.30),
 ]);
 const PLATE_GEO = mergeGeometries([
-  xform(new THREE.BoxGeometry(0.48, 0.16, 0.035), 0, 0.62, 2.225),
-  xform(new THREE.BoxGeometry(0.48, 0.16, 0.035), 0, 0.62, -2.225),
+  xform(new THREE.BoxGeometry(0.5, 0.12, 0.035), 0, 0.49, 2.63),
+  xform(new THREE.BoxGeometry(0.5, 0.12, 0.035), 0, 0.49, -2.63),
 ]);
 const WHEEL_GEO = new THREE.CylinderGeometry(0.42, 0.42, 0.34, 12);
 WHEEL_GEO.rotateZ(Math.PI / 2); // axle along x; spin is rotation.x
-const WHEEL_OFFSETS = [[-0.95, 1.45], [0.95, 1.45], [-0.95, -1.45], [0.95, -1.45]];
+const WHEEL_OFFSETS = [[-1.02, 1.58], [1.02, 1.58], [-1.02, -1.58], [1.02, -1.58]];
 const DOORS_GEO = mergeGeometries([
-  xform(new THREE.BoxGeometry(0.04, 0.5, 1.9), -1.01, 0.72, -0.2),
-  xform(new THREE.BoxGeometry(0.04, 0.5, 1.9), 1.01, 0.72, -0.2),
+  xform(new THREE.BoxGeometry(0.04, 0.28, 1.55), -1.02, 0.64, -0.18),
+  xform(new THREE.BoxGeometry(0.04, 0.28, 1.55), 1.02, 0.64, -0.18),
 ]);
 const POLICE_STRIPE_GEO = mergeGeometries([
-  xform(new THREE.BoxGeometry(0.05, 0.12, 1.65), -1.04, 0.8, -0.2),
-  xform(new THREE.BoxGeometry(0.05, 0.12, 1.65), 1.04, 0.8, -0.2),
+  xform(new THREE.BoxGeometry(0.05, 0.09, 1.5), -1.05, 0.7, -0.18),
+  xform(new THREE.BoxGeometry(0.05, 0.09, 1.5), 1.05, 0.7, -0.18),
 ]);
-const LIGHTBAR_GEO = xform(new THREE.BoxGeometry(1.2, 0.16, 0.5), 0, 1.56, -0.25);
-const LIGHTBAR_RED_GEO = xform(new THREE.BoxGeometry(0.55, 0.2, 0.45), -0.3, 1.56, -0.25);
-const LIGHTBAR_BLUE_GEO = xform(new THREE.BoxGeometry(0.55, 0.2, 0.45), 0.3, 1.56, -0.25);
+const LIGHTBAR_GEO = xform(new THREE.BoxGeometry(1.25, 0.14, 0.42), 0, 1.50, -0.24);
+const LIGHTBAR_RED_GEO = xform(new THREE.BoxGeometry(0.56, 0.18, 0.38), -0.31, 1.50, -0.24);
+const LIGHTBAR_BLUE_GEO = xform(new THREE.BoxGeometry(0.56, 0.18, 0.38), 0.31, 1.50, -0.24);
 
 const WHEEL_MAT = new THREE.MeshStandardMaterial({ color: 0x14161a, roughness: 0.95 });
 // Opaque, unlit blue-grey vertex colors cannot inherit sunset or body tint.
-// Disable tone mapping too, keeping the painted reflection neutral and stable.
+// toneMapped=false keeps those cool values stable under the warm scene grade.
 const GLASS_MAT = new THREE.MeshBasicMaterial({ color: 0xffffff, vertexColors: true, fog: false, toneMapped: false });
+const DRIVER_MAT = new THREE.MeshBasicMaterial({ color: 0x20262b });
 const LIGHT_MAT = new THREE.MeshStandardMaterial({ color: 0xfff6c8, emissive: 0xffe9a0, emissiveIntensity: 0.8 });
 const TAIL_MAT = new THREE.MeshStandardMaterial({ color: 0xc02020, emissive: 0x800000, emissiveIntensity: 0.6 });
 const DARK_MAT = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.5 });
@@ -114,21 +143,16 @@ const BLUE_FLASH_MAT = new THREE.MeshStandardMaterial({ color: 0x2040ff, emissiv
 // (7 meshes instead of the old 11; the police look lives in the fleet).
 export function buildCarMesh(color) {
   const group = new THREE.Group();
-  const bodyMat = new THREE.MeshStandardMaterial({ color, roughness: 0.78, metalness: 0.04 });
+  const bodyMat = new THREE.MeshPhysicalMaterial({ color, roughness: 0.24, metalness: 0.18, clearcoat: 1, clearcoatRoughness: 0.14 });
   const body = new THREE.Mesh(BODY_GEO, bodyMat);
   body.castShadow = true;
   group.add(body);
   const cabin = new THREE.Mesh(CABIN_GEO, GLASS_MAT);
   cabin.castShadow = true;
   group.add(cabin);
-  // Driver silhouette rises above the opaque side glass so it reads in chase shots.
-  const driverMat = new THREE.MeshBasicMaterial({ color: 0x20262b });
-  const driverHead = new THREE.Mesh(new THREE.SphereGeometry(0.24, 10, 8), driverMat);
-  driverHead.position.set(-0.28, 1.53, 0.05);
-  group.add(driverHead);
-  const driverShoulders = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.28, 0.28), driverMat);
-  driverShoulders.position.set(-0.28, 1.28, 0.05);
-  group.add(driverShoulders);
+  // The player's driver peeks just above the low roofline and stays readable
+  // without changing the opaque, color-stable glass shared with the fleet.
+  group.add(new THREE.Mesh(DRIVER_GEO, DRIVER_MAT));
   const grille = new THREE.Mesh(GRILLE_GEO, GRILLE_MAT);
   group.add(grille);
   const mirrors = new THREE.Mesh(MIRROR_GEO, bodyMat);
@@ -156,9 +180,10 @@ export function buildCarMesh(color) {
 // One fleet draws every traffic and police car as instanced parts.
 // sync() is called once per frame with the live car arrays.
 export function createCarFleet(scene, capacity = 40, policeCapacity = 8) {
-  const bodyMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.78, metalness: 0.04 });
+  const bodyMat = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.24, metalness: 0.18, clearcoat: 1, clearcoatRoughness: 0.14 });
   const body = new THREE.InstancedMesh(BODY_GEO, bodyMat, capacity);
   const cabin = new THREE.InstancedMesh(CABIN_GEO, GLASS_MAT, capacity);
+  const drivers = new THREE.InstancedMesh(DRIVER_GEO, DRIVER_MAT, capacity);
   const grille = new THREE.InstancedMesh(GRILLE_GEO, GRILLE_MAT, capacity);
   const mirrors = new THREE.InstancedMesh(MIRROR_GEO, bodyMat, capacity);
   const plates = new THREE.InstancedMesh(PLATE_GEO, PLATE_MAT, capacity);
@@ -188,8 +213,13 @@ export function createCarFleet(scene, capacity = 40, policeCapacity = 8) {
   // (acne) and turned the white police cruisers black in the chase shot.
   // The player's own car (buildCarMesh) and pedestrians still cast, so
   // moving things keep their grounding shadows.
-  for (const m of [body, cabin, grille, mirrors, plates, lights, tails, wheels, hubs, barBase, doors, policeStripe, red, blue]) {
+  // Frustum culling is off for the fleet: an InstancedMesh is culled by the
+  // bounding sphere of its geometry at the origin, so the whole fleet
+  // vanished whenever the camera drove far from the origin (the coastal
+  // chase shot showed floating POLICE labels with no car bodies).
+  for (const m of [body, cabin, drivers, grille, mirrors, plates, lights, tails, wheels, hubs, barBase, doors, policeStripe, red, blue]) {
     m.castShadow = false;
+    m.frustumCulled = false;
     m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     scene.add(m);
   }
@@ -222,6 +252,7 @@ export function createCarFleet(scene, capacity = 40, policeCapacity = 8) {
       body.setColorAt(i, _c.setHex(car.color ?? 0xd8d8d8));
       mirrors.setColorAt(i, _c.setHex(car.color ?? 0xd8d8d8));
       cabin.setMatrixAt(i, _m);
+      drivers.setMatrixAt(i, _m);
       grille.setMatrixAt(i, _m);
       mirrors.setMatrixAt(i, _m);
       plates.setMatrixAt(i, _m);
@@ -260,6 +291,7 @@ export function createCarFleet(scene, capacity = 40, policeCapacity = 8) {
     }
     body.count = n;
     cabin.count = n;
+    drivers.count = n;
     grille.count = n;
     mirrors.count = n;
     plates.count = n;
@@ -276,7 +308,7 @@ export function createCarFleet(scene, capacity = 40, policeCapacity = 8) {
     policeStripe.count = p;
     for (let i = p; i < policeLabels.length; i += 1) policeLabels[i].visible = false;
     for (let i = 0; i < p; i += 1) policeLabels[i].visible = true;
-    for (const m of [body, cabin, grille, mirrors, plates, lights, tails, wheels, hubs, barBase, doors, policeStripe, red, blue]) {
+    for (const m of [body, cabin, drivers, grille, mirrors, plates, lights, tails, wheels, hubs, barBase, doors, policeStripe, red, blue]) {
       m.instanceMatrix.needsUpdate = true;
     }
     // Light bar flash, in sync across units (same phase as before).
