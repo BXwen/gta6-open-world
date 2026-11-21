@@ -85,8 +85,12 @@ export function createCarFleet(scene, capacity = 40, policeCapacity = 8) {
   const doors = new THREE.InstancedMesh(DOORS_GEO, DOOR_MAT, policeCapacity);
   const red = new THREE.InstancedMesh(LIGHTBAR_RED_GEO, RED_FLASH_MAT, policeCapacity);
   const blue = new THREE.InstancedMesh(LIGHTBAR_BLUE_GEO, BLUE_FLASH_MAT, policeCapacity);
+  // The fleet does not cast shadows: the instanced parts self-shadowed
+  // (acne) and turned the white police cruisers black in the chase shot.
+  // The player's own car (buildCarMesh) and pedestrians still cast, so
+  // moving things keep their grounding shadows.
   for (const m of [body, cabin, lights, tails, wheels, barBase, doors, red, blue]) {
-    m.castShadow = true;
+    m.castShadow = false;
     m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     scene.add(m);
   }

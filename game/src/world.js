@@ -37,7 +37,7 @@ function facadeTexture(rows, base, rng) {
   const cellH = (256 - marginY * 2) / rows;
   for (let r = 0; r < rows; r += 1) {
     for (let c = 0; c < cols; c += 1) {
-      const lit = rng.next() < 0.3;
+      const lit = rng.next() < 0.45;
       g.fillStyle = lit ? '#ffe9a8' : '#2c3a48';
       g.fillRect(
         marginX + c * cellW + cellW * 0.22,
@@ -81,8 +81,10 @@ function groundTexture(rng) {
   const g = canvas.getContext('2d');
   const S = 2048 / 480; // px per world unit, world runs -240..240
   const toPx = (v) => (v + 240) * S;
-  // Asphalt base.
-  g.fillStyle = '#3a3f46';
+  // Asphalt base: a warm light grey, so the road reads as a sunlit
+  // street against the tan sidewalks instead of a dark band. (The old
+  // #3a3f46/#4a4d55 read nearly black in the chase screenshot.)
+  g.fillStyle = '#6b675e';
   g.fillRect(0, 0, 2048, 2048);
   // Sidewalk blocks.
   for (const bx of BLOCK_CENTERS) {
@@ -291,12 +293,18 @@ export function buildWorld(scene, rng) {
       }
     }
   }
+  // Buildings and roofs do NOT cast shadows: a 40–58 m tower throws a
+  // 45–65 m shadow across the avenue, and that dark band is what ruined
+  // the chase screenshot (verified: shadows-off the road reads bright
+  // and the white police cruisers pop). Cars, people, palms and props
+  // still cast, so moving things keep their grounding shadows; the
+  // facades carry their own top-lit gradient for modelling.
   for (const { mat, entries } of buildingBuckets.values()) {
-    const mesh = mergedMesh(entries, mat, { cast: true });
+    const mesh = mergedMesh(entries, mat, { cast: false });
     group.add(mesh);
   }
   for (const [color, entries] of roofBuckets) {
-    const mesh = mergedMesh(entries, new THREE.MeshStandardMaterial({ color, roughness: 0.95 }), { cast: true });
+    const mesh = mergedMesh(entries, new THREE.MeshStandardMaterial({ color, roughness: 0.95 }), { cast: false });
     group.add(mesh);
   }
   if (acEntries.length) group.add(mergedMesh(acEntries, new THREE.MeshStandardMaterial({ color: 0x777777, roughness: 0.9 })));
@@ -565,10 +573,10 @@ export function buildWorld(scene, rng) {
     puffGeos.push(xform(new THREE.SphereGeometry(rng.range(4, 8), 10, 8), j * 6 - 6, rng.range(-1, 1), rng.range(-2, 2), 0, 0, 0, 1, 0.45, 1));
   }
   const cloudGeo = mergeGeometries(puffGeos);
-  const clouds = new THREE.InstancedMesh(cloudGeo, cloudMat, 7);
+  const clouds = new THREE.InstancedMesh(cloudGeo, cloudMat, 10);
   const cloudPos = [];
   const _m4 = new THREE.Matrix4();
-  for (let i = 0; i < 7; i += 1) {
+  for (let i = 0; i < 10; i += 1) {
     const p = { x: rng.range(-200, 200), y: rng.range(55, 80), z: rng.range(-200, 200) };
     cloudPos.push(p);
     _m4.makeTranslation(p.x, p.y, p.z);
@@ -577,14 +585,42 @@ export function buildWorld(scene, rng) {
   clouds.instanceMatrix.needsUpdate = true;
   group.add(clouds);
 
-  // Sun disc low in the south-west sky, warm and large.
+  // Sun disc in the southern sky, warm and large, roughly where the
+  // directional light comes from.
   const sun = new THREE.Mesh(
-    new THREE.CircleGeometry(22, 24),
+    new THREE.CircleGeometry(26, 24),
     new THREE.MeshBasicMaterial({ color: 0xffd9a0, fog: false }),
   );
-  sun.position.set(-280, 62, 300);
+  sun.position.set(15, 120, 300);
   sun.lookAt(0, 0, 0);
   group.add(sun);
+
+  // Police helicopter: a simple visual unit circling overhead (posed into
+  // the chase/mission shots by stageShot). Seven meshes; the rotor spins.
+  const heli = new THREE.Group();
+  const heliMat = new THREE.MeshStandardMaterial({ color: 0x1c2a44, roughness: 0.5, metalness: 0.4 });
+  const heliBody = new THREE.Mesh(new THREE.BoxGeometry(4.2, 1.6, 2.2), heliMat);
+  heli.add(heliBody);
+  const heliStripe = new THREE.Mesh(new THREE.BoxGeometry(4.3, 0.5, 2.3), new THREE.MeshStandardMaterial({ color: 0xf2f2f2, roughness: 0.6 }));
+  heliStripe.position.y = 0.25;
+  heli.add(heliStripe);
+  const heliTail = new THREE.Mesh(new THREE.BoxGeometry(4.5, 0.7, 0.7), heliMat);
+  heliTail.position.set(-4, 0.3, 0);
+  heli.add(heliTail);
+  const heliFin = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1.6, 1.2), heliMat);
+  heliFin.position.set(-6.1, 0.9, 0);
+  heli.add(heliFin);
+  const heliRotor = new THREE.Mesh(new THREE.BoxGeometry(9, 0.12, 0.5), new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.4, metalness: 0.6 }));
+  heliRotor.position.y = 1.1;
+  heli.add(heliRotor);
+  const heliSkidL = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.12, 0.25), heliMat);
+  heliSkidL.position.set(0, -1.05, 0.9);
+  heli.add(heliSkidL);
+  const heliSkidR = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.12, 0.25), heliMat);
+  heliSkidR.position.set(0, -1.05, -0.9);
+  heli.add(heliSkidR);
+  group.add(heli);
+  const heliOrbit = { cx: 0, cz: 0, r: 110, h: 55, angle: 0.6, speed: 0.045 };
 
   return {
     group,
@@ -600,6 +636,25 @@ export function buildWorld(scene, rng) {
       }
       clouds.instanceMatrix.needsUpdate = true;
       seaTex.offset.x += dt * 0.008;
+      // Helicopter circles its orbit centre, nose along the tangent.
+      heliOrbit.angle += dt * heliOrbit.speed;
+      heli.position.set(
+        heliOrbit.cx + Math.cos(heliOrbit.angle) * heliOrbit.r,
+        heliOrbit.h,
+        heliOrbit.cz + Math.sin(heliOrbit.angle) * heliOrbit.r,
+      );
+      heli.rotation.y = -heliOrbit.angle;
+      heliRotor.rotation.y += dt * 22;
+    },
+    // Pose the helicopter for a screenshot: orbit centre (cx, cz), radius
+    // r, height h, starting angle, angular speed (0 = hover in place).
+    setHeliOrbit(cx, cz, r, h, angle = 0.6, speed = 0.045) {
+      heliOrbit.cx = cx;
+      heliOrbit.cz = cz;
+      heliOrbit.r = r;
+      heliOrbit.h = h;
+      heliOrbit.angle = angle;
+      heliOrbit.speed = speed;
     },
   };
 }

@@ -43,16 +43,22 @@ renderer.shadowMap.enabled = !lowQuality;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.05;
+renderer.toneMappingExposure = 1.18;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x2a2a55);
 scene.fog = new THREE.Fog(0xe8a87a, 180, 600);
 
-const hemi = new THREE.HemisphereLight(0xffd9b0, 0x8a6a55, 0.85);
+const hemi = new THREE.HemisphereLight(0xffd9b0, 0x9a7a65, 1.45);
 scene.add(hemi);
-const sun = new THREE.DirectionalLight(0xffd9a0, 2.2);
-sun.position.set(-160, 90, 60);
+// High warm afternoon sun (~41° elevation) from just east of south:
+// shadows point due north, along the avenues, so the road the chase
+// drives up stays sunlit and the police cruisers ahead show their lit
+// fronts. Any east component wider than ~5° lets the east buildings'
+// shadows drift west and close the sunlit gap over the avenue — that
+// drift is what kept the dark band in the first re-shoot.
+const sun = new THREE.DirectionalLight(0xffd9a0, 2.6);
+sun.position.set(15, 150, 170);
 sun.castShadow = !lowQuality;
 // A tight shadow frustum around the player (it follows the player below):
 // far fewer objects render into the shadow map than the old 320-wide box.
@@ -838,20 +844,26 @@ function update(dt) {
   }
   updateWanted(dt);
 
-  // Chase-shot staging: keep the car rolling and the police units posed
-  // ahead in frame — a roadblock forming up the street — so the shot
-  // reads as a chase. The pin runs for the whole life of the chase shot
-  // page (it exists only to take this screenshot), which also stops the
-  // units ramming the car and bursting particles into the frame.
+  // Chase-shot staging: keep the car rolling at ~80 km/h and the police
+  // units posed ahead in frame — a roadblock forming up the street — so
+  // the shot reads as a chase. The pin runs for the whole life of the
+  // chase shot page (it exists only to take this screenshot), which also
+  // stops the units ramming the car and bursting particles into the frame.
   if (shot === 'chase' && playerCar && !playerCar.wrecked) {
-    playerCar.speed = Math.max(playerCar.speed, 14);
+    playerCar.speed = Math.max(playerCar.speed, 22); // 22 u/s = 79 km/h
     police.cars.forEach((pc, i) => {
-      const ahead = 25 + i * 8;
-      const side = i % 2 === 0 ? 5 : -5;
+      const ahead = 14 + i * 6;
+      const side = i % 2 === 0 ? 4.5 : -4.5;
       pc.x = playerCar.x + side;
       pc.z = playerCar.z + ahead;
       pc.heading = Math.atan2(playerCar.x - pc.x, playerCar.z - pc.z);
     });
+  }
+  // Mission-shot staging: same ~80 km/h pin. Without it the staged car
+  // coasts down from its initial speed and the speedometer reads 0 by
+  // the time the screenshot is taken.
+  if (shot === 'mission' && playerCar && !playerCar.wrecked) {
+    playerCar.speed = Math.max(playerCar.speed, 22); // 22 u/s = 79 km/h
   }
   // The fleet draws every traffic and police car from the data above.
   fleet.sync(traffic.cars, police.cars);
@@ -890,7 +902,8 @@ function update(dt) {
     ? { x: playerCar.x, y: 1.6, z: playerCar.z }
     : { x: player.x, y: player.y + 1.7, z: player.z };
   // Chase cam eases toward the car's heading when the mouse rests.
-  if (inCar && playerCar && performance.now() - lastMouseMove > 2500) {
+  // Skipped on staged screenshot pages so the staged yaw holds.
+  if (inCar && playerCar && !shot && performance.now() - lastMouseMove > 2500) {
     let diff = playerCar.heading - input.yaw;
     while (diff > Math.PI) diff -= Math.PI * 2;
     while (diff < -Math.PI) diff += Math.PI * 2;
@@ -898,7 +911,7 @@ function update(dt) {
   }
   const yaw = input.yaw;
   const pitch = input.pitch;
-  const dist = inCar ? 11 : 7.5;
+  const dist = inCar ? (shot === 'chase' || shot === 'mission' ? 7 : 11) : 7.5;
   const height = 2.4 + pitch * 5;
   const cx = focus.x - Math.sin(yaw) * Math.cos(pitch) * dist;
   const cz = focus.z - Math.cos(yaw) * Math.cos(pitch) * dist;
@@ -919,8 +932,9 @@ function update(dt) {
   fovKick += (targetFov - (62 + fovKick)) * Math.min(1, dt * 4);
   camera.fov = 62 + fovKick;
   camera.updateProjectionMatrix();
-  // Sun shadow follows the player, low in the west for long sunset shadows.
-  sun.position.set(focus.x - 160, 90, focus.z + 60);
+  // Sun shadow follows the player, high in the south (just east of it)
+  // so shadows run north along the avenues and the road stays bright.
+  sun.position.set(focus.x + 15, 150, focus.z + 170);
   sun.target.position.set(focus.x, 0, focus.z);
   sun.target.updateMatrixWorld();
 
@@ -1067,6 +1081,7 @@ function stageShot(name) {
   if (name === 'start') {
     hud.showTitle(null);
     screen = 'title';
+    world.setHeliOrbit(0, -60, 0, 30, 0, 0);
     readyIn(2);
     return;
   }
@@ -1075,6 +1090,7 @@ function stageShot(name) {
     teleportPlayer(-16, 12);
     input.setYaw(Math.PI * 0.78);
     input.setPitch(0.3);
+    world.setHeliOrbit(80, -80, 0, 28, 0, 0);
     readyIn(3);
   } else if (name === 'mission') {
     missions.startMission(1, 0); // mission 2: the Comet GT
@@ -1085,23 +1101,27 @@ function stageShot(name) {
     giveCar(0xe8c832);
     teleportPlayer(0, -100);
     playerCar.heading = 0; // rolling north up Ocean Ave
-    playerCar.speed = 8;
+    playerCar.speed = 22; // ~80 km/h from the first frame
     missions.arrive(); // pickup -> deliver: "Deliver the Comet GT..."
-    input.setYaw(0);
-    input.setPitch(0.3);
+    // Rear three-quarter chase framing: the yaw easing is disabled on
+    // shot pages, so this angle holds for the screenshot.
+    input.setYaw(0.22);
+    input.setPitch(0.2);
+    world.setHeliOrbit(10, 50, 0, 25, 0, 0);
     readyIn(3);
   } else if (name === 'chase') {
     missions.startMission(2, 2); // mission 3: the getaway
     giveCar(0xc23b2e);
     teleportPlayer(0, -150); // 4 s of rolling stops well short of the z=-62 intersection
     playerCar.heading = 0;
-    playerCar.speed = 16; // rolling down the street as the chase forms
-    input.setYaw(0);
-    input.setPitch(0.3);
+    playerCar.speed = 22; // rolling down the street as the chase forms
+    input.setYaw(0.22);
+    input.setPitch(0.2);
     wanted = 3;
     lastCrimeTime = elapsed;
     hud.setStars(3);
     police.update(0.1, 3, player, playerCar, colliders, null);
+    world.setHeliOrbit(10, 0, 0, 26, 0, 0);
     readyIn(3);
   } else {
     readyIn(2);
