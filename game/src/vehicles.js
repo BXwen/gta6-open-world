@@ -15,15 +15,20 @@ import { mergeGeometries, xform } from './merge.js';
 const BODY_GEO = mergeGeometries([
   xform(new THREE.BoxGeometry(1.92, 0.5, 4.25), 0, 0.58, 0),
   xform(new THREE.BoxGeometry(1.88, 0.24, 1.05), 0, 0.88, 1.55),
-  xform(new THREE.BoxGeometry(1.08, 0.18, 1.48), 0, 1.49, -0.28),
   xform(new THREE.BoxGeometry(2.02, 0.16, 0.18), 0, 0.53, 2.16),
   xform(new THREE.BoxGeometry(2.02, 0.16, 0.18), 0, 0.53, -2.16),
 ]);
 const CABIN_GEO = mergeGeometries([
-  xform(new THREE.BoxGeometry(1.34, 0.27, 0.07), 0, 1.27, 0.57, -0.28),
-  xform(new THREE.BoxGeometry(1.34, 0.27, 0.07), 0, 1.27, -1.12, 0.28),
-  xform(new THREE.BoxGeometry(0.07, 0.27, 0.62), -0.72, 1.27, -0.28),
-  xform(new THREE.BoxGeometry(0.07, 0.27, 0.62), 0.72, 1.27, -0.28),
+  // Dark roof glazing stays neutral under the warm sunset light.
+  xform(new THREE.BoxGeometry(1.08, 0.18, 1.48), 0, 1.49, -0.28),
+  // Full-height front and rear panes close the gaps that exposed the warm
+  // body shell in the chase framing.
+  xform(new THREE.BoxGeometry(1.48, 0.9, 0.07), 0, 1.25, 0.57, -0.28),
+  xform(new THREE.BoxGeometry(1.48, 0.9, 0.07), 0, 1.25, -1.12, 0.28),
+  // Continuous side glazing closes the gaps that let the sunlit body color
+  // show through around the cabin and keeps the whole window band dark.
+  xform(new THREE.BoxGeometry(0.07, 0.9, 1.48), -0.72, 1.25, -0.28),
+  xform(new THREE.BoxGeometry(0.07, 0.9, 1.48), 0.72, 1.25, -0.28),
 ]);
 const LIGHTS_GEO = mergeGeometries([
   xform(new THREE.BoxGeometry(0.42, 0.16, 0.08), -0.62, 0.66, 2.22),
@@ -60,7 +65,7 @@ const LIGHTBAR_RED_GEO = xform(new THREE.BoxGeometry(0.55, 0.2, 0.45), -0.3, 1.5
 const LIGHTBAR_BLUE_GEO = xform(new THREE.BoxGeometry(0.55, 0.2, 0.45), 0.3, 1.56, -0.25);
 
 const WHEEL_MAT = new THREE.MeshStandardMaterial({ color: 0x14161a, roughness: 0.95 });
-const GLASS_MAT = new THREE.MeshStandardMaterial({ color: 0x1c2a38, roughness: 0.15, metalness: 0.4 });
+const GLASS_MAT = new THREE.MeshBasicMaterial({ color: 0x111719, fog: false });
 const LIGHT_MAT = new THREE.MeshStandardMaterial({ color: 0xfff6c8, emissive: 0xffe9a0, emissiveIntensity: 0.8 });
 const TAIL_MAT = new THREE.MeshStandardMaterial({ color: 0xc02020, emissive: 0x800000, emissiveIntensity: 0.6 });
 const DARK_MAT = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.5 });
@@ -76,13 +81,21 @@ const BLUE_FLASH_MAT = new THREE.MeshStandardMaterial({ color: 0x2040ff, emissiv
 // (7 meshes instead of the old 11; the police look lives in the fleet).
 export function buildCarMesh(color) {
   const group = new THREE.Group();
-  const bodyMat = new THREE.MeshStandardMaterial({ color, roughness: 0.35, metalness: 0.55 });
+  const bodyMat = new THREE.MeshStandardMaterial({ color, roughness: 0.78, metalness: 0.04 });
   const body = new THREE.Mesh(BODY_GEO, bodyMat);
   body.castShadow = true;
   group.add(body);
   const cabin = new THREE.Mesh(CABIN_GEO, GLASS_MAT);
   cabin.castShadow = true;
   group.add(cabin);
+  // Driver silhouette rises above the opaque side glass so it reads in chase shots.
+  const driverMat = new THREE.MeshBasicMaterial({ color: 0x20262b });
+  const driverHead = new THREE.Mesh(new THREE.SphereGeometry(0.24, 10, 8), driverMat);
+  driverHead.position.set(-0.28, 1.53, 0.05);
+  group.add(driverHead);
+  const driverShoulders = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.28, 0.28), driverMat);
+  driverShoulders.position.set(-0.28, 1.28, 0.05);
+  group.add(driverShoulders);
   const grille = new THREE.Mesh(GRILLE_GEO, GRILLE_MAT);
   group.add(grille);
   const mirrors = new THREE.Mesh(MIRROR_GEO, bodyMat);
@@ -110,7 +123,7 @@ export function buildCarMesh(color) {
 // One fleet draws every traffic and police car as instanced parts.
 // sync() is called once per frame with the live car arrays.
 export function createCarFleet(scene, capacity = 40, policeCapacity = 8) {
-  const bodyMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.35, metalness: 0.55 });
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.78, metalness: 0.04 });
   const body = new THREE.InstancedMesh(BODY_GEO, bodyMat, capacity);
   const cabin = new THREE.InstancedMesh(CABIN_GEO, GLASS_MAT, capacity);
   const grille = new THREE.InstancedMesh(GRILLE_GEO, GRILLE_MAT, capacity);
@@ -123,6 +136,19 @@ export function createCarFleet(scene, capacity = 40, policeCapacity = 8) {
   const barBase = new THREE.InstancedMesh(LIGHTBAR_GEO, DARK_MAT, policeCapacity);
   const doors = new THREE.InstancedMesh(DOORS_GEO, DOOR_MAT, policeCapacity);
   const policeStripe = new THREE.InstancedMesh(POLICE_STRIPE_GEO, POLICE_STRIPE_MAT, policeCapacity);
+  const policeLabels = [];
+  for (let i = 0; i < policeCapacity; i += 1) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256; canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#17202a'; ctx.fillRect(2, 2, 252, 60);
+    ctx.fillStyle = '#fff1be'; ctx.font = 'bold 38px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('POLICE', 128, 32);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const label = new THREE.Mesh(new THREE.PlaneGeometry(1.55, 0.39), new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide, depthWrite: false }));
+    scene.add(label);
+    policeLabels.push(label);
+  }
   const red = new THREE.InstancedMesh(LIGHTBAR_RED_GEO, RED_FLASH_MAT, policeCapacity);
   const blue = new THREE.InstancedMesh(LIGHTBAR_BLUE_GEO, BLUE_FLASH_MAT, policeCapacity);
   // The fleet does not cast shadows: the instanced parts self-shadowed
@@ -143,21 +169,22 @@ export function createCarFleet(scene, capacity = 40, policeCapacity = 8) {
   const _c = new THREE.Color();
   const _wm = new THREE.Matrix4();
 
-  function carMatrix(car) {
+  function carMatrix(car, scale = 1) {
     _e.set(0, car.heading, 0);
     _q.setFromEuler(_e);
     _v.set(car.x, 0, car.z);
-    _m.compose(_v, _q, _s);
+    _m.compose(_v, _q, _s.setScalar(scale));
+    _s.setScalar(1);
     return _m;
   }
 
   function sync(trafficCars, policeCars) {
     let n = 0;
-    const writeCar = (car) => {
+    const writeCar = (car, scale = 1) => {
       if (n >= capacity) return;
       const i = n;
       n += 1;
-      carMatrix(car);
+      carMatrix(car, scale);
       body.setMatrixAt(i, _m);
       body.setColorAt(i, _c.setHex(car.color ?? 0xd8d8d8));
       mirrors.setColorAt(i, _c.setHex(car.color ?? 0xd8d8d8));
@@ -181,12 +208,18 @@ export function createCarFleet(scene, capacity = 40, policeCapacity = 8) {
     for (const car of trafficCars) writeCar(car);
     let p = 0;
     for (const car of policeCars) {
-      writeCar(car);
+      writeCar(car, 1.18);
       if (p < policeCapacity) {
-        carMatrix(car);
+        carMatrix(car, 1.18);
         barBase.setMatrixAt(p, _m);
         doors.setMatrixAt(p, _m);
         policeStripe.setMatrixAt(p, _m);
+        const label = policeLabels[p];
+        // The staged chase looks into the police fronts. Put the readable
+        // badge on that face; it remains camera-facing for any heading.
+        label.position.set(car.x + Math.sin(car.heading) * 2.62, 0.78, car.z + Math.cos(car.heading) * 2.62);
+        label.rotation.set(0, car.heading, 0);
+        label.scale.setScalar(1.18);
         red.setMatrixAt(p, _m);
         blue.setMatrixAt(p, _m);
         p += 1;
@@ -208,6 +241,8 @@ export function createCarFleet(scene, capacity = 40, policeCapacity = 8) {
     if (body.instanceColor) body.instanceColor.needsUpdate = true;
     if (mirrors.instanceColor) mirrors.instanceColor.needsUpdate = true;
     policeStripe.count = p;
+    for (let i = p; i < policeLabels.length; i += 1) policeLabels[i].visible = false;
+    for (let i = 0; i < p; i += 1) policeLabels[i].visible = true;
     for (const m of [body, cabin, grille, mirrors, plates, lights, tails, wheels, hubs, barBase, doors, policeStripe, red, blue]) {
       m.instanceMatrix.needsUpdate = true;
     }

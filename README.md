@@ -64,13 +64,3 @@ node serve.ts
 | R | Restart current mission |
 | M | Mute sound |
 | Esc / P | Pause |
-
-## Screenshots
-
-The cover is the getaway: the red Comet GT at 50 km/h heading into a police
-roadblock at 3 stars.
-
-![Chase](screenshots/1-chase.jpg)
-![City](screenshots/2-city.jpg)
-![Mission](screenshots/3-mission.jpg)
-![Title](screenshots/4-start.jpg)

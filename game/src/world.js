@@ -153,10 +153,10 @@ function skyTexture() {
   canvas.height = 256;
   const g = canvas.getContext('2d');
   const grad = g.createLinearGradient(0, 0, 0, 256);
-  grad.addColorStop(0, '#232a55'); // zenith: deep dusk blue
-  grad.addColorStop(0.3, '#6a4a8a'); // purple
-  grad.addColorStop(0.5, '#ff9a5a'); // horizon: sunset orange
-  grad.addColorStop(0.62, '#ffb347'); // golden band
+    grad.addColorStop(0, '#20204f'); // saturated indigo zenith
+    grad.addColorStop(0.3, '#883c91'); // magenta transition
+    grad.addColorStop(0.5, '#ff7546'); // vivid sunset orange
+    grad.addColorStop(0.62, '#ffad2f'); // golden band
   grad.addColorStop(1, '#1a1a2e'); // below the horizon, never seen
   g.fillStyle = grad;
   g.fillRect(0, 0, 16, 256);
@@ -528,6 +528,7 @@ export function buildWorld(scene, rng) {
       palmSpots.push([x + rng.range(-4, 4), 202 + rng.range(-2, 4)]);
     }
     palmSpots.push([-18, -14], [18, 14], [-14, 18], [14, -18]);
+    for (const z of [-170, -108, -46, 46, 108, 170]) { palmSpots.push([-8, z], [8, z]); }
     for (const [px, pz] of palmSpots) {
       trunkEntries.push({ geo: new THREE.CylinderGeometry(0.22, 0.34, 6.5, 7), x: px, y: 3.25, z: pz, rz: 0.08 });
       for (let i = 0; i < 6; i += 1) {
@@ -675,7 +676,7 @@ export function buildWorld(scene, rng) {
   // directional light comes from.
   const sun = new THREE.Mesh(
     new THREE.CircleGeometry(26, 24),
-    new THREE.MeshBasicMaterial({ color: 0xffd9a0, fog: false }),
+    new THREE.MeshBasicMaterial({ color: 0xff9b4d, fog: false }),
   );
   sun.position.set(15, 120, 300);
   sun.lookAt(0, 0, 0);
@@ -684,13 +685,13 @@ export function buildWorld(scene, rng) {
   // Police helicopter: a simple visual unit circling overhead (posed into
   // the chase/mission shots by stageShot). Seven meshes; the rotor spins.
   const heli = new THREE.Group();
-  const heliMat = new THREE.MeshStandardMaterial({ color: 0x1c2a44, roughness: 0.5, metalness: 0.4 });
+  const heliMat = new THREE.MeshStandardMaterial({ color: 0xd4d9d7, roughness: 0.82, metalness: 0 });
   const heliBody = new THREE.Mesh(new THREE.BoxGeometry(5.8, 1.8, 2.5), heliMat);
   heli.add(heliBody);
-  const heliStripe = new THREE.Mesh(new THREE.BoxGeometry(5.9, 0.42, 2.58), new THREE.MeshStandardMaterial({ color: 0xf2f2f2, roughness: 0.6 }));
+  const heliStripe = new THREE.Mesh(new THREE.BoxGeometry(5.9, 0.42, 2.58), new THREE.MeshStandardMaterial({ color: 0x233c52, roughness: 0.78, metalness: 0 }));
   heliStripe.position.y = 0.25;
   heli.add(heliStripe);
-  const cockpit = new THREE.Mesh(new THREE.BoxGeometry(1.55, 1.05, 2.36), new THREE.MeshStandardMaterial({ color: 0x24495a, roughness: 0.16, metalness: 0.45, emissive: 0x10232a, emissiveIntensity: 0.25 }));
+  const cockpit = new THREE.Mesh(new THREE.BoxGeometry(1.55, 1.05, 2.36), new THREE.MeshStandardMaterial({ color: 0x263f48, roughness: 0.48, metalness: 0.04, emissive: 0x10191c, emissiveIntensity: 0.12 }));
   cockpit.position.set(2.6, 0.24, 0);
   heli.add(cockpit);
   const heliTail = new THREE.Mesh(new THREE.BoxGeometry(5.8, 0.48, 0.58), heliMat);
@@ -699,10 +700,10 @@ export function buildWorld(scene, rng) {
   const heliFin = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1.6, 1.2), heliMat);
   heliFin.position.set(-8, 0.9, 0);
   heli.add(heliFin);
-  const heliRotor = new THREE.Mesh(new THREE.BoxGeometry(12, 0.1, 0.42), new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.4, metalness: 0.6 }));
+  const heliRotor = new THREE.Mesh(new THREE.BoxGeometry(12, 0.16, 0.42), new THREE.MeshStandardMaterial({ color: 0x29343a, roughness: 0.82, metalness: 0 }));
   heliRotor.position.y = 1.2;
   heli.add(heliRotor);
-  const tailRotor = new THREE.Mesh(new THREE.BoxGeometry(0.12, 2.2, 0.12), new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.45, metalness: 0.5 }));
+  const tailRotor = new THREE.Mesh(new THREE.BoxGeometry(0.12, 2.2, 0.12), new THREE.MeshStandardMaterial({ color: 0x29343a, roughness: 0.82, metalness: 0 }));
   tailRotor.position.set(-8.1, 0.8, 0);
   heli.add(tailRotor);
   const heliSkidL = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.12, 0.25), heliMat);
@@ -711,16 +712,20 @@ export function buildWorld(scene, rng) {
   const heliSkidR = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.12, 0.25), heliMat);
   heliSkidR.position.set(0, -1.15, -1.05);
   heli.add(heliSkidR);
-  const heliSpot = new THREE.Mesh(new THREE.ConeGeometry(2.5, 12, 12, 1, true), new THREE.MeshBasicMaterial({ color: 0xfff0bd, transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false }));
-  heliSpot.position.set(2.4, -6.1, 0);
-  heliSpot.rotation.z = Math.PI;
-  heli.add(heliSpot);
   const heliLamp = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffefb0 }));
   heliLamp.position.set(2.7, -0.65, 0);
   heli.add(heliLamp);
+  const cone = new THREE.Mesh(new THREE.ConeGeometry(2.8, 5.8, 20, 1, true), new THREE.MeshBasicMaterial({ color: 0xfff0b0, transparent: true, opacity: 0.24, depthWrite: false, side: THREE.DoubleSide }));
+  cone.position.set(2.7, -3.4, 0);
+  cone.scale.set(0.42, 1, 0.42);
+  heli.add(cone);
+  heliRotor.material.transparent = true;
+  heliRotor.material.opacity = 0.42;
   group.add(heli);
   heli.scale.setScalar(1.45);
   const heliOrbit = { cx: 0, cz: 0, r: 110, h: 55, angle: 0.6, speed: 0.045 };
+
+  let heliFollow = null;
 
   return {
     group,
@@ -745,6 +750,29 @@ export function buildWorld(scene, rng) {
       );
       heli.rotation.y = -heliOrbit.angle;
       heliRotor.rotation.y += dt * 22;
+    },
+    // Camera-oriented offsets relative to the moving subject, never a
+    // fixed world position. Keep the aircraft over the open avenue.
+    followHeli(target, yaw, offset = {}) {
+      heliFollow = {
+        target, yaw,
+        forward: offset.forward ?? 28,
+        side: offset.side ?? 9,
+        height: offset.height ?? 5.2,
+      };
+    },
+    updateHeliFollow() {
+      if (!heliFollow) return;
+      const { target, yaw, forward, side, height } = heliFollow;
+      const a = yaw();
+      heli.position.set(
+        target.x + Math.sin(a) * forward + Math.cos(a) * side,
+        height,
+        target.z + Math.cos(a) * forward - Math.sin(a) * side,
+      );
+      // Present the fuselage broadside to the camera so its tail, cabin,
+      // and spinning rotor read clearly at the longer follow distance.
+      heli.rotation.y = a;
     },
     // Pose the helicopter for a screenshot: orbit centre (cx, cz), radius
     // r, height h, starting angle, angular speed (0 = hover in place).

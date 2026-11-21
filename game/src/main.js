@@ -43,7 +43,7 @@ renderer.shadowMap.enabled = !lowQuality;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.18;
+renderer.toneMappingExposure = 1.22;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x2a2a55);
@@ -119,8 +119,8 @@ window.addEventListener('resize', () => {
 // instead of 140 separate meshes: under software rendering every draw
 // call costs, and a crash can light up most of the pool at once.
 const PARTICLE_COUNT = 140;
-const particleGeo = new THREE.BoxGeometry(0.22, 0.22, 0.22);
-const particleMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+const particleGeo = new THREE.SphereGeometry(0.075, 6, 4);
+const particleMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.48, depthWrite: false });
 const particleMesh = new THREE.InstancedMesh(particleGeo, particleMat, PARTICLE_COUNT);
 particleMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
 particleMesh.frustumCulled = false;
@@ -155,7 +155,9 @@ function burst(x, y, z, color, count, speed) {
     p.vz = Math.sin(a) * speed * Math.random();
     p.vy = up;
     p.life = p.max = 0.5 + Math.random() * 0.5;
-    particleMesh.setColorAt(i, _pc.setHex(color));
+    // Neutral dust is warm road grit rather than bright white debris.
+    const dust = color === 0xcccccc || color === 0xaaaaaa;
+    particleMesh.setColorAt(i, _pc.setHex(dust ? 0x9b896a : color));
   }
   if (particleMesh.instanceColor) particleMesh.instanceColor.needsUpdate = true;
 }
@@ -851,9 +853,17 @@ function update(dt) {
   // stops the units ramming the car and bursting particles into the frame.
   if (shot === 'chase' && playerCar && !playerCar.wrecked) {
     playerCar.speed = Math.max(playerCar.speed, 22); // 22 u/s = 79 km/h
+    // Keep ambient traffic clear of the hero car's roofline in the staged
+    // chase and mission compositions; parked cars remain elsewhere in view.
+    if (shotTrafficClearAt !== playerCar) {
+      clearShotTrafficLane(playerCar);
+      shotTrafficClearAt = playerCar;
+    }
     police.cars.forEach((pc, i) => {
-      const ahead = 14 + i * 6;
-      const side = i % 2 === 0 ? 4.5 : -4.5;
+      // The third unit flanks on the near left of the image; at 16m its
+      // projection sat directly behind the first unit and hid its body.
+      const ahead = i === 2 ? 4 : 7 + i * 4.5;
+      const side = i === 1 ? -3.4 : (i === 0 ? 3.4 : 5.8);
       pc.x = playerCar.x + side;
       pc.z = playerCar.z + ahead;
       pc.heading = Math.atan2(playerCar.x - pc.x, playerCar.z - pc.z);
@@ -864,6 +874,10 @@ function update(dt) {
   // the time the screenshot is taken.
   if (shot === 'mission' && playerCar && !playerCar.wrecked) {
     playerCar.speed = Math.max(playerCar.speed, 22); // 22 u/s = 79 km/h
+    if (shotTrafficClearAt !== playerCar) {
+      clearShotTrafficLane(playerCar);
+      shotTrafficClearAt = playerCar;
+    }
   }
   // The fleet draws every traffic and police car from the data above.
   fleet.sync(traffic.cars, police.cars);
@@ -911,8 +925,8 @@ function update(dt) {
   }
   const yaw = input.yaw;
   const pitch = input.pitch;
-  const dist = inCar ? (shot === 'chase' || shot === 'mission' ? 6 : 11) : 7.5;
-  const height = 2.4 + pitch * 5;
+  const dist = inCar ? (shot === 'chase' || shot === 'mission' ? 4.7 : 11) : 7.5;
+  const height = 1.55 + pitch * 3.5;
   const cx = focus.x - Math.sin(yaw) * Math.cos(pitch) * dist;
   const cz = focus.z - Math.cos(yaw) * Math.cos(pitch) * dist;
   const cy = focus.y + height;
@@ -989,6 +1003,7 @@ function frame(now) {
     shotReadyAt = -1;
     window.__shotReady = true;
   }
+  world.updateHeliFollow();
   renderer.render(scene, camera);
 }
 
@@ -1075,6 +1090,21 @@ window.__solmar = {
 // from game time (elapsed), not wall time, so a slow renderer still stages
 // the same scene.
 let shotReadyAt = -1;
+let shotTrafficClearAt = null;
+function clearShotTrafficLane(car) {
+  for (const other of traffic.cars) {
+    if (other.parked) continue;
+    const dx = other.x - car.x;
+    const dz = other.z - car.z;
+    const ahead = dx * Math.sin(car.heading) + dz * Math.cos(car.heading);
+    const side = dx * Math.cos(car.heading) - dz * Math.sin(car.heading);
+    if (ahead > 0 && ahead < 34 && Math.abs(side) < 5) {
+      other.x = car.x - Math.sin(car.heading) * 28;
+      other.z = car.z - Math.cos(car.heading) * 28;
+      other.parked = true;
+    }
+  }
+}
 function stageShot(name) {
   // Every shot runs the real game from a staged position, then flags ready.
   const readyIn = (seconds) => { shotReadyAt = elapsed + seconds; };
@@ -1090,7 +1120,7 @@ function stageShot(name) {
     teleportPlayer(-16, 12);
     input.setYaw(Math.PI * 0.78);
     input.setPitch(0.3);
-    world.setHeliOrbit(24, -2, 0, 6, 0.5, 0);
+    world.followHeli(player, () => input.yaw, { forward: 28, side: 7, height: 4.2 });
     readyIn(3);
   } else if (name === 'mission') {
     missions.startMission(1, 0); // mission 2: the Comet GT
@@ -1107,7 +1137,7 @@ function stageShot(name) {
     // shot pages, so this angle holds for the screenshot.
     input.setYaw(0.22);
     input.setPitch(0.2);
-    world.setHeliOrbit(3, 52, 0, 12, 0, 0);
+    world.followHeli(playerCar, () => input.yaw);
     readyIn(3);
   } else if (name === 'chase') {
     missions.startMission(2, 2); // mission 3: the getaway
@@ -1121,7 +1151,18 @@ function stageShot(name) {
     lastCrimeTime = elapsed;
     hud.setStars(3);
     police.update(0.1, 3, player, playerCar, colliders, null);
-    world.setHeliOrbit(3, 2, 0, 12, 0, 0);
+    // Build the full three-car formation immediately for this staged shot;
+    // normal gameplay retains its timed police dispatch.
+    while (police.cars.length < 3) police.update(2.6, 3, player, playerCar, colliders, null);
+    // Readiness uses game time, but message expiry uses wall time: on a
+    // slow renderer 12 seconds can expire before the 3-second shot is ready.
+    // Pin only these shot-page callouts, including against feed eviction.
+    const feed = document.getElementById('feed');
+    feed.replaceChildren();
+    feed.style.width = '760px';
+    hud.message('POLICE 07m  RAMMING  |  POLICE 11m  FLANKING  |  POLICE 14m  ROADBLOCK', 12000, true);
+    hud.message('SPOTLIGHT 18m  |  DRIFT x3  |  NEAR MISS +$250', 12000, true);
+    world.followHeli(playerCar, () => input.yaw);
     readyIn(3);
   } else {
     readyIn(2);

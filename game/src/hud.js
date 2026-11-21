@@ -65,12 +65,20 @@ export function createHud() {
     els['speed-unit'].textContent = driving ? 'km/h' : '';
   }
 
-  function message(text, ms = 4200) {
+  function message(text, ms = 4200, pinned = false) {
     const div = document.createElement('div');
     div.className = 'feed-line';
     div.textContent = text;
+    if (pinned) div.dataset.pinned = 'true';
     els.feed.appendChild(div);
-    while (els.feed.children.length > 4) els.feed.removeChild(els.feed.firstChild);
+    while (els.feed.children.length > 4) {
+      const oldest = Array.from(els.feed.children).find((line) => !line.dataset.pinned);
+      if (!oldest) break;
+      oldest.remove();
+    }
+    // Staged screenshot callouts must survive slow rendering and later
+    // messages. Ordinary gameplay messages retain their existing lifetime.
+    if (pinned) return;
     setTimeout(() => {
       div.classList.add('fade');
       setTimeout(() => div.remove(), 600);
