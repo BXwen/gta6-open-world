@@ -255,15 +255,23 @@ export function createTraffic(scene, rng, colliders) {
 }
 export function createPolice(scene, rng) {
   const cars = [];
+  const streetBlockSize = 62;
   let spawnClock = 0;
-  function addCruiser(player) {
+  function addCruiser(player, speed) {
     const heading = rng.pick([0, Math.PI / 2, Math.PI, -Math.PI / 2]);
     const distance = rng.range(40, 60);
-    const x = streetCoordinate(player.x + Math.cos(heading) * distance);
-    const z = streetCoordinate(player.z + Math.sin(heading) * distance);
+    const dx = Math.cos(heading);
+    const dz = Math.sin(heading);
+    let x = streetCoordinate(player.x + dx * distance);
+    let z = streetCoordinate(player.z + dz * distance);
+    if (Math.hypot(x - player.x, z - player.z) < 55) {
+      const fartherDistance = distance + streetBlockSize;
+      x = streetCoordinate(player.x + dx * fartherDistance);
+      z = streetCoordinate(player.z + dz * fartherDistance);
+    }
     const cruiser = makeRoadCar(x, z, Math.atan2(player.x - x, player.z - z), 0xf4f2e9, 0);
     cruiser.isPolice = true;
-    cruiser.speed = 27;
+    cruiser.speed = speed;
     cruiser.ramCooldown = 0;
     cars.push(cruiser);
   }
@@ -274,12 +282,13 @@ export function createPolice(scene, rng) {
       spawnClock = 0;
       return;
     }
+    const target = playerCar || player;
+    const pursuitSpeed = playerCar ? 27 : 14;
     spawnClock += Math.max(0, dt);
     while (cars.length < desired && spawnClock >= 1.5) {
       spawnClock -= 1.5;
-      addCruiser(playerCar || player);
+      addCruiser(target, pursuitSpeed);
     }
-    const target = playerCar || player;
     for (const unit of cars) {
       unit.ramCooldown = Math.max(0, unit.ramCooldown - dt);
       const dx = target.x - unit.x;
@@ -290,7 +299,7 @@ export function createPolice(scene, rng) {
       while (turn > Math.PI) turn -= Math.PI * 2;
       while (turn < -Math.PI) turn += Math.PI * 2;
       unit.heading += Math.max(-1, Math.min(1, turn)) * Math.min(1, dt * 2.2);
-      unit.speed = 27;
+      unit.speed = pursuitSpeed;
       if (distance < 3.2) {
         unit.speed *= 0.2;
         if (unit.ramCooldown <= 0) {
