@@ -911,7 +911,7 @@ function update(dt) {
   }
   const yaw = input.yaw;
   const pitch = input.pitch;
-  const dist = inCar ? (shot === 'chase' || shot === 'mission' ? 7 : 11) : 7.5;
+  const dist = inCar ? (shot === 'chase' || shot === 'mission' ? 6 : 11) : 7.5;
   const height = 2.4 + pitch * 5;
   const cx = focus.x - Math.sin(yaw) * Math.cos(pitch) * dist;
   const cz = focus.z - Math.cos(yaw) * Math.cos(pitch) * dist;
@@ -1081,7 +1081,7 @@ function stageShot(name) {
   if (name === 'start') {
     hud.showTitle(null);
     screen = 'title';
-    world.setHeliOrbit(0, -60, 0, 30, 0, 0);
+    world.setHeliOrbit(14, -62, 0, 34, 0, 0);
     readyIn(2);
     return;
   }
@@ -1090,7 +1090,7 @@ function stageShot(name) {
     teleportPlayer(-16, 12);
     input.setYaw(Math.PI * 0.78);
     input.setPitch(0.3);
-    world.setHeliOrbit(80, -80, 0, 28, 0, 0);
+    world.setHeliOrbit(24, -2, 0, 6, 0.5, 0);
     readyIn(3);
   } else if (name === 'mission') {
     missions.startMission(1, 0); // mission 2: the Comet GT
@@ -1107,7 +1107,7 @@ function stageShot(name) {
     // shot pages, so this angle holds for the screenshot.
     input.setYaw(0.22);
     input.setPitch(0.2);
-    world.setHeliOrbit(10, 50, 0, 25, 0, 0);
+    world.setHeliOrbit(3, 52, 0, 12, 0, 0);
     readyIn(3);
   } else if (name === 'chase') {
     missions.startMission(2, 2); // mission 3: the getaway
@@ -1121,7 +1121,7 @@ function stageShot(name) {
     lastCrimeTime = elapsed;
     hud.setStars(3);
     police.update(0.1, 3, player, playerCar, colliders, null);
-    world.setHeliOrbit(10, 0, 0, 26, 0, 0);
+    world.setHeliOrbit(3, 2, 0, 12, 0, 0);
     readyIn(3);
   } else {
     readyIn(2);

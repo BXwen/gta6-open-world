@@ -13,10 +13,18 @@ import { mergeGeometries, xform } from './merge.js';
 
 // Shared geometries (car-local space, origin at ground centre).
 const BODY_GEO = mergeGeometries([
-  xform(new THREE.BoxGeometry(2, 0.62, 4.4), 0, 0.62, 0),
-  xform(new THREE.BoxGeometry(1.9, 0.18, 1.1), 0, 0.98, 1.55),
+  xform(new THREE.BoxGeometry(1.92, 0.5, 4.25), 0, 0.58, 0),
+  xform(new THREE.BoxGeometry(1.88, 0.24, 1.05), 0, 0.88, 1.55),
+  xform(new THREE.BoxGeometry(1.08, 0.18, 1.48), 0, 1.49, -0.28),
+  xform(new THREE.BoxGeometry(2.02, 0.16, 0.18), 0, 0.53, 2.16),
+  xform(new THREE.BoxGeometry(2.02, 0.16, 0.18), 0, 0.53, -2.16),
 ]);
-const CABIN_GEO = xform(new THREE.BoxGeometry(1.7, 0.58, 2.1), 0, 1.2, -0.25);
+const CABIN_GEO = mergeGeometries([
+  xform(new THREE.BoxGeometry(1.34, 0.27, 0.07), 0, 1.27, 0.57, -0.28),
+  xform(new THREE.BoxGeometry(1.34, 0.27, 0.07), 0, 1.27, -1.12, 0.28),
+  xform(new THREE.BoxGeometry(0.07, 0.27, 0.62), -0.72, 1.27, -0.28),
+  xform(new THREE.BoxGeometry(0.07, 0.27, 0.62), 0.72, 1.27, -0.28),
+]);
 const LIGHTS_GEO = mergeGeometries([
   xform(new THREE.BoxGeometry(0.42, 0.16, 0.08), -0.62, 0.66, 2.22),
   xform(new THREE.BoxGeometry(0.42, 0.16, 0.08), 0.62, 0.66, 2.22),
@@ -25,12 +33,27 @@ const TAILS_GEO = mergeGeometries([
   xform(new THREE.BoxGeometry(0.42, 0.16, 0.08), -0.62, 0.66, -2.22),
   xform(new THREE.BoxGeometry(0.42, 0.16, 0.08), 0.62, 0.66, -2.22),
 ]);
+const GRILLE_GEO = xform(new THREE.BoxGeometry(0.72, 0.22, 0.06), 0, 0.62, 2.18);
+const HUB_GEO = new THREE.CylinderGeometry(0.2, 0.2, 0.36, 12);
+HUB_GEO.rotateZ(Math.PI / 2);
+const MIRROR_GEO = mergeGeometries([
+  xform(new THREE.BoxGeometry(0.12, 0.08, 0.18), -0.99, 1.12, 0.3),
+  xform(new THREE.BoxGeometry(0.12, 0.08, 0.18), 0.99, 1.12, 0.3),
+]);
+const PLATE_GEO = mergeGeometries([
+  xform(new THREE.BoxGeometry(0.48, 0.16, 0.035), 0, 0.62, 2.225),
+  xform(new THREE.BoxGeometry(0.48, 0.16, 0.035), 0, 0.62, -2.225),
+]);
 const WHEEL_GEO = new THREE.CylinderGeometry(0.42, 0.42, 0.34, 12);
 WHEEL_GEO.rotateZ(Math.PI / 2); // axle along x; spin is rotation.x
 const WHEEL_OFFSETS = [[-0.95, 1.45], [0.95, 1.45], [-0.95, -1.45], [0.95, -1.45]];
 const DOORS_GEO = mergeGeometries([
   xform(new THREE.BoxGeometry(0.04, 0.5, 1.9), -1.01, 0.72, -0.2),
   xform(new THREE.BoxGeometry(0.04, 0.5, 1.9), 1.01, 0.72, -0.2),
+]);
+const POLICE_STRIPE_GEO = mergeGeometries([
+  xform(new THREE.BoxGeometry(0.05, 0.12, 1.65), -1.04, 0.8, -0.2),
+  xform(new THREE.BoxGeometry(0.05, 0.12, 1.65), 1.04, 0.8, -0.2),
 ]);
 const LIGHTBAR_GEO = xform(new THREE.BoxGeometry(1.2, 0.16, 0.5), 0, 1.56, -0.25);
 const LIGHTBAR_RED_GEO = xform(new THREE.BoxGeometry(0.55, 0.2, 0.45), -0.3, 1.56, -0.25);
@@ -41,7 +64,11 @@ const GLASS_MAT = new THREE.MeshStandardMaterial({ color: 0x1c2a38, roughness: 0
 const LIGHT_MAT = new THREE.MeshStandardMaterial({ color: 0xfff6c8, emissive: 0xffe9a0, emissiveIntensity: 0.8 });
 const TAIL_MAT = new THREE.MeshStandardMaterial({ color: 0xc02020, emissive: 0x800000, emissiveIntensity: 0.6 });
 const DARK_MAT = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.5 });
+const GRILLE_MAT = new THREE.MeshStandardMaterial({ color: 0x20252a, roughness: 0.55, metalness: 0.35 });
+const HUB_MAT = new THREE.MeshStandardMaterial({ color: 0xc5c7c9, roughness: 0.35, metalness: 0.8 });
+const PLATE_MAT = new THREE.MeshStandardMaterial({ color: 0xe9e1c9, roughness: 0.8 });
 const DOOR_MAT = new THREE.MeshStandardMaterial({ color: 0x14161a, roughness: 0.4, metalness: 0.4 });
+const POLICE_STRIPE_MAT = new THREE.MeshStandardMaterial({ color: 0xe8e1c8, roughness: 0.55 });
 const RED_FLASH_MAT = new THREE.MeshStandardMaterial({ color: 0xff2020, emissive: 0xff0000, emissiveIntensity: 1.5 });
 const BLUE_FLASH_MAT = new THREE.MeshStandardMaterial({ color: 0x2040ff, emissive: 0x0020ff, emissiveIntensity: 1.5 });
 
@@ -56,6 +83,11 @@ export function buildCarMesh(color) {
   const cabin = new THREE.Mesh(CABIN_GEO, GLASS_MAT);
   cabin.castShadow = true;
   group.add(cabin);
+  const grille = new THREE.Mesh(GRILLE_GEO, GRILLE_MAT);
+  group.add(grille);
+  const mirrors = new THREE.Mesh(MIRROR_GEO, bodyMat);
+  group.add(mirrors);
+  group.add(new THREE.Mesh(PLATE_GEO, PLATE_MAT));
   const head = new THREE.Mesh(LIGHTS_GEO, LIGHT_MAT);
   group.add(head);
   const tail = new THREE.Mesh(TAILS_GEO, TAIL_MAT);
@@ -66,6 +98,9 @@ export function buildCarMesh(color) {
     wheel.position.set(wx, 0.42, wz);
     wheel.castShadow = true;
     group.add(wheel);
+    const hub = new THREE.Mesh(HUB_GEO, HUB_MAT);
+    hub.position.set(wx * 1.018, 0.42, wz);
+    group.add(hub);
     wheels.push(wheel);
   }
   group.userData.wheels = wheels;
@@ -78,18 +113,23 @@ export function createCarFleet(scene, capacity = 40, policeCapacity = 8) {
   const bodyMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.35, metalness: 0.55 });
   const body = new THREE.InstancedMesh(BODY_GEO, bodyMat, capacity);
   const cabin = new THREE.InstancedMesh(CABIN_GEO, GLASS_MAT, capacity);
+  const grille = new THREE.InstancedMesh(GRILLE_GEO, GRILLE_MAT, capacity);
+  const mirrors = new THREE.InstancedMesh(MIRROR_GEO, bodyMat, capacity);
+  const plates = new THREE.InstancedMesh(PLATE_GEO, PLATE_MAT, capacity);
   const lights = new THREE.InstancedMesh(LIGHTS_GEO, LIGHT_MAT, capacity);
   const tails = new THREE.InstancedMesh(TAILS_GEO, TAIL_MAT, capacity);
   const wheels = new THREE.InstancedMesh(WHEEL_GEO, WHEEL_MAT, capacity * 4);
+  const hubs = new THREE.InstancedMesh(HUB_GEO, HUB_MAT, capacity * 4);
   const barBase = new THREE.InstancedMesh(LIGHTBAR_GEO, DARK_MAT, policeCapacity);
   const doors = new THREE.InstancedMesh(DOORS_GEO, DOOR_MAT, policeCapacity);
+  const policeStripe = new THREE.InstancedMesh(POLICE_STRIPE_GEO, POLICE_STRIPE_MAT, policeCapacity);
   const red = new THREE.InstancedMesh(LIGHTBAR_RED_GEO, RED_FLASH_MAT, policeCapacity);
   const blue = new THREE.InstancedMesh(LIGHTBAR_BLUE_GEO, BLUE_FLASH_MAT, policeCapacity);
   // The fleet does not cast shadows: the instanced parts self-shadowed
   // (acne) and turned the white police cruisers black in the chase shot.
   // The player's own car (buildCarMesh) and pedestrians still cast, so
   // moving things keep their grounding shadows.
-  for (const m of [body, cabin, lights, tails, wheels, barBase, doors, red, blue]) {
+  for (const m of [body, cabin, grille, mirrors, plates, lights, tails, wheels, hubs, barBase, doors, policeStripe, red, blue]) {
     m.castShadow = false;
     m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     scene.add(m);
@@ -120,7 +160,11 @@ export function createCarFleet(scene, capacity = 40, policeCapacity = 8) {
       carMatrix(car);
       body.setMatrixAt(i, _m);
       body.setColorAt(i, _c.setHex(car.color ?? 0xd8d8d8));
+      mirrors.setColorAt(i, _c.setHex(car.color ?? 0xd8d8d8));
       cabin.setMatrixAt(i, _m);
+      grille.setMatrixAt(i, _m);
+      mirrors.setMatrixAt(i, _m);
+      plates.setMatrixAt(i, _m);
       lights.setMatrixAt(i, _m);
       tails.setMatrixAt(i, _m);
       // Wheels: car matrix times the local offset + spin.
@@ -131,6 +175,7 @@ export function createCarFleet(scene, capacity = 40, policeCapacity = 8) {
         _wm.compose(_v, _q, _s);
         _wm.premultiply(_m);
         wheels.setMatrixAt(i * 4 + w, _wm);
+        hubs.setMatrixAt(i * 4 + w, _wm);
       }
     };
     for (const car of trafficCars) writeCar(car);
@@ -141,6 +186,7 @@ export function createCarFleet(scene, capacity = 40, policeCapacity = 8) {
         carMatrix(car);
         barBase.setMatrixAt(p, _m);
         doors.setMatrixAt(p, _m);
+        policeStripe.setMatrixAt(p, _m);
         red.setMatrixAt(p, _m);
         blue.setMatrixAt(p, _m);
         p += 1;
@@ -148,15 +194,21 @@ export function createCarFleet(scene, capacity = 40, policeCapacity = 8) {
     }
     body.count = n;
     cabin.count = n;
+    grille.count = n;
+    mirrors.count = n;
+    plates.count = n;
     lights.count = n;
     tails.count = n;
     wheels.count = n * 4;
+    hubs.count = n * 4;
     barBase.count = p;
     doors.count = p;
     red.count = p;
     blue.count = p;
     if (body.instanceColor) body.instanceColor.needsUpdate = true;
-    for (const m of [body, cabin, lights, tails, wheels, barBase, doors, red, blue]) {
+    if (mirrors.instanceColor) mirrors.instanceColor.needsUpdate = true;
+    policeStripe.count = p;
+    for (const m of [body, cabin, grille, mirrors, plates, lights, tails, wheels, hubs, barBase, doors, policeStripe, red, blue]) {
       m.instanceMatrix.needsUpdate = true;
     }
     // Light bar flash, in sync across units (same phase as before).

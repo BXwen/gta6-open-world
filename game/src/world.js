@@ -106,6 +106,26 @@ function groundTexture(rng) {
       g.fillRect(toPx(s) - 1.5, toPx(d), 3, 8 * S);
     }
   }
+  // Stop bars, dark utility covers and fine asphalt repairs make the road
+  // surface read as paved city infrastructure without adding draw calls.
+  g.fillStyle = 'rgba(244,238,218,0.9)';
+  for (const sx of [-62, 0, 62]) {
+    for (const sz of [-62, 0, 62]) {
+      g.fillRect(toPx(sx - 8), toPx(sz - 10), 16 * S, 0.8 * S);
+      g.fillRect(toPx(sx - 10), toPx(sz - 8), 0.8 * S, 16 * S);
+    }
+  }
+  for (const [mx, mz] of [[-31, -62], [31, 0], [62, 31], [0, 124], [-124, 62], [124, -124]]) {
+    g.fillStyle = '#514f4a';
+    g.beginPath(); g.ellipse(toPx(mx), toPx(mz), 1.1 * S, 0.65 * S, 0, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = '#8d887c'; g.lineWidth = 2;
+    g.beginPath(); g.ellipse(toPx(mx), toPx(mz), 0.8 * S, 0.43 * S, 0, 0, Math.PI * 2); g.stroke();
+  }
+  g.strokeStyle = 'rgba(48,48,45,0.28)';
+  g.lineWidth = 2;
+  for (const [x, z, dx, dz] of [[-90, -62, 5, 1], [26, 0, -3, 2], [62, 95, 4, -2], [156, -124, -5, 1], [-186, 62, 3, 2]]) {
+    g.beginPath(); g.moveTo(toPx(x), toPx(z)); g.lineTo(toPx(x + dx), toPx(z + dz)); g.lineTo(toPx(x + dx + 1), toPx(z + dz + 2)); g.stroke();
+  }
   // Crosswalk stripes at the four main intersections.
   for (const sx of [-62, 0, 62]) {
     for (const sz of [-62, 0, 62]) {
@@ -241,6 +261,10 @@ export function buildWorld(scene, rng) {
   const skip = new Set(['0,0', '62,62', '-155,-155']);
   const buildingBuckets = new Map(); // key -> { mat, entries }
   const roofBuckets = new Map(); // roof color -> entries
+  const ledgeEntries = [];
+  const balconyEntries = [];
+  const awningBuckets = new Map();
+  const shopGlassEntries = [];
   const acEntries = [];
   const tankEntries = [];
   const tankRoofEntries = [];
@@ -272,6 +296,25 @@ export function buildWorld(scene, rng) {
         const color = rng.pick(PALETTE.building);
         const rows = h < 20 ? 5 : 9;
         buildingMat(color, rows).entries.push({ geo: new THREE.BoxGeometry(w, h, d), x, y: h / 2, z });
+        // A shallow setback at the roof and occasional street-facing balconies
+        // break up the flat block silhouette while staying batched by material.
+        ledgeEntries.push({ geo: new THREE.BoxGeometry(w + 0.9, 0.28, d + 0.9), x, y: h * 0.72, z });
+        if (h > 13 && rng.chance(0.48)) {
+          for (const side of [-1, 1]) {
+            balconyEntries.push({ geo: new THREE.BoxGeometry(w * 0.58, 0.18, 1.45), x, y: Math.min(h - 1.4, 5.4), z: z + side * (d / 2 + 0.7) });
+            balconyEntries.push({ geo: new THREE.BoxGeometry(w * 0.58, 0.7, 0.12), x, y: Math.min(h - 1, 5.8), z: z + side * (d / 2 + 1.35) });
+          }
+        }
+        // Ground-floor shop glazing and striped awnings add a human scale to
+        // the otherwise residential tower blocks.
+        if (h > 12) {
+          for (const side of [-1, 1]) {
+            shopGlassEntries.push({ geo: new THREE.BoxGeometry(w * 0.58, 2.5, 0.08), x, y: 1.75, z: z + side * (d / 2 + 0.06) });
+            const awningColor = rng.pick([0xc23b2e, 0xe8c832, 0x2e8f8a]);
+            if (!awningBuckets.has(awningColor)) awningBuckets.set(awningColor, []);
+            awningBuckets.get(awningColor).push({ geo: new THREE.BoxGeometry(w * 0.68, 0.22, 1.3), x, y: 3.25, z: z + side * (d / 2 + 0.62) });
+          }
+        }
         // Roof cap, merged per roof color.
         const roofColor = rng.pick(PALETTE.roof);
         if (!roofBuckets.has(roofColor)) roofBuckets.set(roofColor, []);
@@ -307,6 +350,10 @@ export function buildWorld(scene, rng) {
     const mesh = mergedMesh(entries, new THREE.MeshStandardMaterial({ color, roughness: 0.95 }), { cast: false });
     group.add(mesh);
   }
+  group.add(mergedMesh(ledgeEntries, new THREE.MeshStandardMaterial({ color: 0xb2a89a, roughness: 0.88 }), { cast: false }));
+  if (balconyEntries.length) group.add(mergedMesh(balconyEntries, new THREE.MeshStandardMaterial({ color: 0x766b60, roughness: 0.8 }), { cast: false }));
+  if (shopGlassEntries.length) group.add(mergedMesh(shopGlassEntries, new THREE.MeshStandardMaterial({ color: 0x49636a, roughness: 0.25, metalness: 0.28, emissive: 0x17282c, emissiveIntensity: 0.25 }), { cast: false }));
+  for (const [color, entries] of awningBuckets) group.add(mergedMesh(entries, new THREE.MeshStandardMaterial({ color, roughness: 0.72 }), { cast: false }));
   if (acEntries.length) group.add(mergedMesh(acEntries, new THREE.MeshStandardMaterial({ color: 0x777777, roughness: 0.9 })));
   if (tankEntries.length) group.add(mergedMesh(tankEntries, new THREE.MeshStandardMaterial({ color: 0x6a4a30, roughness: 1 })));
   if (tankRoofEntries.length) group.add(mergedMesh(tankRoofEntries, new THREE.MeshStandardMaterial({ color: 0x4a3423, roughness: 1 })));
@@ -415,6 +462,45 @@ export function buildWorld(scene, rng) {
     group.add(mergedMesh(poleEntries, new THREE.MeshStandardMaterial({ color: 0x2e3238, roughness: 0.6, metalness: 0.5 })));
     group.add(mergedMesh(housingEntries, new THREE.MeshStandardMaterial({ color: 0x1c1e22, roughness: 0.7 })));
     group.add(mergedMesh(lightEntries, new THREE.MeshStandardMaterial({ color: 0x58c96b, emissive: 0x2fae4e, emissiveIntensity: 1.2 })));
+  }
+
+  // Meter posts and benches add curbside detail in a few batched meshes.
+  {
+    const posts = [];
+    const heads = [];
+    const seats = [];
+    const legs = [];
+    for (const [x, z] of [[-52, -18], [-52, 18], [10, -52], [-18, 52], [74, -18], [74, 18], [136, -52], [-136, 52], [198, -18], [-198, 18]]) {
+      posts.push({ geo: new THREE.CylinderGeometry(0.07, 0.1, 1.25, 7), x, y: 0.63, z });
+      heads.push({ geo: new THREE.BoxGeometry(0.32, 0.38, 0.24), x, y: 1.42, z });
+    }
+    for (const [x, z, ry] of [[-48, -12, 0], [-48, 12, 0], [14, -48, Math.PI / 2], [-14, 48, Math.PI / 2], [78, -12, 0], [78, 12, 0], [140, -48, Math.PI / 2], [-140, 48, Math.PI / 2]]) {
+      seats.push({ geo: new THREE.BoxGeometry(3.8, 0.18, 0.82), x, y: 0.62, z, ry });
+      for (const off of [-1.35, 1.35]) legs.push({ geo: new THREE.BoxGeometry(0.18, 0.58, 0.62), x: x + Math.cos(ry) * off, y: 0.3, z: z - Math.sin(ry) * off, ry });
+    }
+    group.add(mergedMesh(posts, new THREE.MeshStandardMaterial({ color: 0x50565a, roughness: 0.55, metalness: 0.65 })));
+    group.add(mergedMesh(heads, new THREE.MeshStandardMaterial({ color: 0xd8d1bd, roughness: 0.45, metalness: 0.35 })));
+    group.add(mergedMesh(seats, new THREE.MeshStandardMaterial({ color: 0x765438, roughness: 0.9 })));
+    group.add(mergedMesh(legs, new THREE.MeshStandardMaterial({ color: 0x35383a, roughness: 0.7, metalness: 0.4 })));
+  }
+
+  // Parked cars fill curb lanes while leaving the traffic and collision grids alone.
+  {
+    const paints = new Map([[0xc23b2e, []], [0xe8c832, []], [0x2e6fc2, []], [0xd8d8d8, []]]);
+    const windows = [];
+    const tires = [];
+    const wheelGeo = new THREE.CylinderGeometry(0.36, 0.36, 0.28, 10);
+    wheelGeo.rotateZ(Math.PI / 2);
+    for (const [x, z, color, ry] of [[-48, -13, 0xc23b2e, 0], [-48, 13, 0x2e6fc2, Math.PI], [14, -48, 0xe8c832, Math.PI / 2], [76, 13, 0xd8d8d8, Math.PI], [138, -48, 0xc23b2e, Math.PI / 2], [-138, 48, 0x2e6fc2, -Math.PI / 2]]) {
+      const add = (entries, geo, px, py, pz) => entries.push({ geo, x: px, y: py, z: pz, ry });
+      add(paints.get(color), new THREE.BoxGeometry(1.85, 0.62, 4), x, 0.62, z);
+      add(paints.get(color), new THREE.BoxGeometry(1.48, 0.5, 1.8), x, 1.17, z - 0.15);
+      add(windows, new THREE.BoxGeometry(1.32, 0.3, 1.55), x, 1.2, z - 0.15);
+      for (const side of [-1, 1]) for (const end of [-1, 1]) add(tires, wheelGeo, x + side * 0.9, 0.38, z + end * 1.25);
+    }
+    for (const [color, entries] of paints) group.add(mergedMesh(entries, new THREE.MeshStandardMaterial({ color, roughness: 0.34, metalness: 0.42 })));
+    group.add(mergedMesh(windows, new THREE.MeshStandardMaterial({ color: 0x293c49, roughness: 0.18, metalness: 0.4 })));
+    group.add(mergedMesh(tires, new THREE.MeshStandardMaterial({ color: 0x17191c, roughness: 0.95 })));
   }
 
   // Fire hydrants and trash cans on sidewalk corners, merged.
@@ -569,15 +655,15 @@ export function buildWorld(scene, rng) {
   // Clouds: one InstancedMesh of a 3-puff blob, drifting with the wind.
   const cloudMat = new THREE.MeshStandardMaterial({ color: 0xffd9c0, roughness: 1, transparent: true, opacity: 0.85 });
   const puffGeos = [];
-  for (let j = 0; j < 3; j += 1) {
-    puffGeos.push(xform(new THREE.SphereGeometry(rng.range(4, 8), 10, 8), j * 6 - 6, rng.range(-1, 1), rng.range(-2, 2), 0, 0, 0, 1, 0.45, 1));
+  for (let j = 0; j < 4; j += 1) {
+    puffGeos.push(xform(new THREE.SphereGeometry(rng.range(5, 10), 10, 8), j * 6 - 9, rng.range(-1, 1), rng.range(-2, 2), 0, 0, 0, 1, 0.42, 1));
   }
   const cloudGeo = mergeGeometries(puffGeos);
-  const clouds = new THREE.InstancedMesh(cloudGeo, cloudMat, 10);
+  const clouds = new THREE.InstancedMesh(cloudGeo, cloudMat, 16);
   const cloudPos = [];
   const _m4 = new THREE.Matrix4();
-  for (let i = 0; i < 10; i += 1) {
-    const p = { x: rng.range(-200, 200), y: rng.range(55, 80), z: rng.range(-200, 200) };
+  for (let i = 0; i < 16; i += 1) {
+    const p = { x: rng.range(-220, 220), y: rng.range(58, 92), z: rng.range(-220, 220) };
     cloudPos.push(p);
     _m4.makeTranslation(p.x, p.y, p.z);
     clouds.setMatrixAt(i, _m4);
@@ -599,27 +685,41 @@ export function buildWorld(scene, rng) {
   // the chase/mission shots by stageShot). Seven meshes; the rotor spins.
   const heli = new THREE.Group();
   const heliMat = new THREE.MeshStandardMaterial({ color: 0x1c2a44, roughness: 0.5, metalness: 0.4 });
-  const heliBody = new THREE.Mesh(new THREE.BoxGeometry(4.2, 1.6, 2.2), heliMat);
+  const heliBody = new THREE.Mesh(new THREE.BoxGeometry(5.8, 1.8, 2.5), heliMat);
   heli.add(heliBody);
-  const heliStripe = new THREE.Mesh(new THREE.BoxGeometry(4.3, 0.5, 2.3), new THREE.MeshStandardMaterial({ color: 0xf2f2f2, roughness: 0.6 }));
+  const heliStripe = new THREE.Mesh(new THREE.BoxGeometry(5.9, 0.42, 2.58), new THREE.MeshStandardMaterial({ color: 0xf2f2f2, roughness: 0.6 }));
   heliStripe.position.y = 0.25;
   heli.add(heliStripe);
-  const heliTail = new THREE.Mesh(new THREE.BoxGeometry(4.5, 0.7, 0.7), heliMat);
-  heliTail.position.set(-4, 0.3, 0);
+  const cockpit = new THREE.Mesh(new THREE.BoxGeometry(1.55, 1.05, 2.36), new THREE.MeshStandardMaterial({ color: 0x24495a, roughness: 0.16, metalness: 0.45, emissive: 0x10232a, emissiveIntensity: 0.25 }));
+  cockpit.position.set(2.6, 0.24, 0);
+  heli.add(cockpit);
+  const heliTail = new THREE.Mesh(new THREE.BoxGeometry(5.8, 0.48, 0.58), heliMat);
+  heliTail.position.set(-5.3, 0.3, 0);
   heli.add(heliTail);
   const heliFin = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1.6, 1.2), heliMat);
-  heliFin.position.set(-6.1, 0.9, 0);
+  heliFin.position.set(-8, 0.9, 0);
   heli.add(heliFin);
-  const heliRotor = new THREE.Mesh(new THREE.BoxGeometry(9, 0.12, 0.5), new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.4, metalness: 0.6 }));
-  heliRotor.position.y = 1.1;
+  const heliRotor = new THREE.Mesh(new THREE.BoxGeometry(12, 0.1, 0.42), new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.4, metalness: 0.6 }));
+  heliRotor.position.y = 1.2;
   heli.add(heliRotor);
-  const heliSkidL = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.12, 0.25), heliMat);
-  heliSkidL.position.set(0, -1.05, 0.9);
+  const tailRotor = new THREE.Mesh(new THREE.BoxGeometry(0.12, 2.2, 0.12), new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.45, metalness: 0.5 }));
+  tailRotor.position.set(-8.1, 0.8, 0);
+  heli.add(tailRotor);
+  const heliSkidL = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.12, 0.25), heliMat);
+  heliSkidL.position.set(0, -1.15, 1.05);
   heli.add(heliSkidL);
-  const heliSkidR = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.12, 0.25), heliMat);
-  heliSkidR.position.set(0, -1.05, -0.9);
+  const heliSkidR = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.12, 0.25), heliMat);
+  heliSkidR.position.set(0, -1.15, -1.05);
   heli.add(heliSkidR);
+  const heliSpot = new THREE.Mesh(new THREE.ConeGeometry(2.5, 12, 12, 1, true), new THREE.MeshBasicMaterial({ color: 0xfff0bd, transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false }));
+  heliSpot.position.set(2.4, -6.1, 0);
+  heliSpot.rotation.z = Math.PI;
+  heli.add(heliSpot);
+  const heliLamp = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffefb0 }));
+  heliLamp.position.set(2.7, -0.65, 0);
+  heli.add(heliLamp);
   group.add(heli);
+  heli.scale.setScalar(1.45);
   const heliOrbit = { cx: 0, cz: 0, r: 110, h: 55, angle: 0.6, speed: 0.045 };
 
   return {
