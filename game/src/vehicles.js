@@ -70,22 +70,36 @@ export function buildCarMesh(color) {
 }
 export function createCarFleet(scene, capacity = 40, policeCapacity = 8) {
   const civilianPool = Array.from({ length: capacity }, () => buildCarMesh(CAR_COLORS[0]));
+  const lettering = document.createElement('canvas');
+  lettering.width = 256;
+  lettering.height = 32;
+  const pen = lettering.getContext('2d');
+  pen.fillStyle = '#15243a';
+  pen.fillRect(0, 0, 256, 32);
+  pen.fillStyle = '#fff';
+  pen.font = '900 29px sans-serif';
+  pen.textAlign = 'center';
+  pen.fillText('POLICE', 128, 26);
+  const badge = new Engine.CanvasTexture(lettering);
+  badge.colorSpace = Engine.SRGBColorSpace;
+  const badgeMaterial = new Engine.MeshBasicMaterial({ map: badge, toneMapped: false });
   const policePool = Array.from({ length: policeCapacity }, () => {
     const unit = buildCarMesh(0xf4f2e9);
     const trim = new Engine.MeshStandardMaterial({ color: 0x181b21, metalness: 0.35, roughness: 0.45 });
-    const stripe = new Engine.MeshStandardMaterial({ color: 0xd8d9d5, roughness: 0.6 });
     const bar = new Engine.Group();
-    const red = new Engine.MeshStandardMaterial({ color: 0xff2222, emissive: 0xd00000, emissiveIntensity: 1.5 });
-    const blue = new Engine.MeshStandardMaterial({ color: 0x237dff, emissive: 0x003bff, emissiveIntensity: 1.5 });
-    for (const [material, x] of [[red, -0.34], [blue, 0.34]]) {
-      const beacon = new Engine.Mesh(new Engine.BoxGeometry(0.42, 0.13, 0.23), material);
-      beacon.position.set(x, 1.38, -0.12);
+    const red = new Engine.MeshStandardMaterial({ color: 0xff2222, emissive: 0xff1328, emissiveIntensity: 3.2 });
+    const blue = new Engine.MeshStandardMaterial({ color: 0x237dff, emissive: 0x226aff, emissiveIntensity: 3.2 });
+    for (const [material, x] of [[red, -0.3], [blue, 0.3]]) {
+      const beacon = new Engine.Mesh(new Engine.BoxGeometry(0.57, 0.18, 0.3), material);
+      beacon.position.set(x, 1.4, -0.12);
       bar.add(beacon);
     }
     unit.add(bar);
-    const bandGeometries = [0.81, -0.81].map((x) =>
-      xform(new Engine.BoxGeometry(0.025, 0.13, 2.35), x, 0.77, -0.1));
-    const sideBand = new Engine.Mesh(mergeGeometries(bandGeometries), stripe);
+    const bandGeometries = [-1, 1].flatMap(side => [
+      xform(new Engine.PlaneGeometry(2.3, 0.26), side * 1.057, 0.42, 0, 0, side * Math.PI / 2),
+      xform(new Engine.PlaneGeometry(1.05, 0.14), 0, 0.46, side * 2.609, 0, side > 0 ? 0 : Math.PI),
+    ]);
+    const sideBand = new Engine.Mesh(mergeGeometries(bandGeometries), badgeMaterial);
     unit.add(sideBand);
     bandGeometries.forEach((geometry) => geometry.dispose());
     const frontTrim = new Engine.Mesh(new Engine.BoxGeometry(2.02, 0.16, 0.14), trim);

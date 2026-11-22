@@ -9,7 +9,7 @@ export const CONFIG = {
 };
 export const PALETTE = {
   sky: 8368861, fog: 10401750, sand: 15259042, sea: 3047326, seaDeep: 1923701,
-  asphalt: 3817286, asphaltLine: 16774102, sidewalk: 9146258, grass: 7315034,
+  asphalt: 0x555b63, asphaltLine: 16774102, sidewalk: 9146258, grass: 7315034,
   windowLit: 16771496, windowDark: 2898504, palmTrunk: 9071176,
   palmLeaf: 4165455, lamp: 3027512, pier: 9071170,
   building: [16048830, 14149358, 8632277, 15182263, 15381623, 13599583, 12429002, 14863261, 7715513, 8763034],

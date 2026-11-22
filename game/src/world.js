@@ -275,7 +275,10 @@ function addTerrain(city, random) {
     map: duskMap(), side: Three.BackSide, fog: false, toneMapped: false,
   }));
   addSkyline(city, random);
-  mount(city, plane(GROUND_SIZE, GROUND_SIZE), surface(0xffffff, 0.95, { map: roadMap() }),
+  const asphalt = roadMap();
+  mount(city, plane(GROUND_SIZE, GROUND_SIZE), surface(0xffffff, 0.95, {
+    map: asphalt, emissiveMap: asphalt, emissive: 0xbecde0, emissiveIntensity: 0.27,
+  }),
     [0, 0, 0], { pitch: -RIGHT_ANGLE, receive: true });
   const water = waterMap(random);
   mount(city, plane(560, 220), surface(0xffffff, 0.35, { map: water, metalness: 0.1 }),
@@ -654,19 +657,22 @@ function addAircraft(city) {
     lamp[1] - Math.cos(beam.tilt) * beam.length / 2,
     lamp[2],
   ];
+  const cones = [];
   for (const [radius, facets, hue, opacity] of [[3, 24, 0xfff3c8, 0.35], [1.5, 20, 0xfff8df, 0.3]]) {
-    mount(aircraft, cone(radius, beam.length, facets, 1, true), flat({
+    cones.push(mount(aircraft, cone(radius, beam.length, facets, 1, true), flat({
       color: hue, opacity, side: Three.DoubleSide, toneMapped: false, transparent: true, depthWrite: false,
-    }), midpoint, { roll: beam.tilt });
+    }), midpoint, { roll: beam.tilt }));
   }
   aircraft.scale.setScalar(1.2);
   city.add(aircraft);
-  return { aircraft, rotor };
+  return { aircraft, rotor, cones, lamp: new Three.Vector3(...lamp), beamLength: beam.length };
 }
 
-function aviation(aircraft, rotor) {
+function aviation({ aircraft, rotor, cones, lamp, beamLength }) {
   let orbit = { east: 0, south: 0, radius: 110, altitude: 55, heading: 0.6, rate: 0.045 };
   let chase;
+  const aim = new Three.Vector3();
+  const down = new Three.Vector3(0, -1, 0);
   return {
     advance(elapsed) {
       const heading = orbit.heading + elapsed * orbit.rate;
@@ -679,6 +685,7 @@ function aviation(aircraft, rotor) {
       rotor.rotation.y += 22 * elapsed;
     },
     followHeli(target, yaw, offset = {}) {
+      aircraft.scale.setScalar(0.8);
       const ahead = offset.forward ?? 12;
       const lateral = offset.side ?? 0;
       const altitude = offset.height ?? 8;
@@ -690,6 +697,18 @@ function aviation(aircraft, rotor) {
         const south = target.z + cosine * ahead - sine * lateral;
         aircraft.position.set(east, altitude, south);
         aircraft.rotation.y = facing;
+        if (offset.aimAtTarget) {
+          aim.set(target.x, 0.75, target.z);
+          aircraft.worldToLocal(aim).sub(lamp);
+          const length = aim.length();
+          aim.normalize();
+          for (const [index, cone] of cones.entries()) {
+            cone.position.copy(lamp).addScaledVector(aim, length / 2);
+            cone.quaternion.setFromUnitVectors(down, aim);
+            cone.scale.set(0.35, length / beamLength, 0.35);
+            cone.material.opacity = index === 0 ? 0.09 : 0.07;
+          }
+        }
       };
     },
     updateHeliFollow() {
@@ -719,8 +738,7 @@ export function buildWorld(scene, rng) {
   addMarina(city, barriers, rng);
   const blowClouds = addCloudLayer(city, rng);
   addSun(city);
-  const { aircraft, rotor } = addAircraft(city);
-  const flight = aviation(aircraft, rotor);
+  const flight = aviation(addAircraft(city));
   return {
     group: city,
     colliders: barriers,
