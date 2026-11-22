@@ -468,7 +468,19 @@ function rammed() {
   if (ride.health <= 0) wreckRide();
 }
 function clearShotLane() {
-  if (laneCleared || !ride) return;
+  if (!ride) return;
+  if (shotPage === 'city') {
+    // City shot: random traffic keeps driving/respawning into the hero car, so
+    // a one-time clear cannot hold. Clear every frame instead, but only
+    // non-parked (random) cars near the hero; the staged cars are parked.
+    for (const vehicle of [...motorists.cars]) {
+      if (vehicle.parked) continue;
+      const dx = vehicle.x - ride.x, dz = vehicle.z - ride.z;
+      if (dx * dx + dz * dz < 14 * 14) motorists.remove(vehicle);
+    }
+    return;
+  }
+  if (laneCleared) return;
   laneCleared = true;
   for (const vehicle of [...motorists.cars]) {
     const dx = vehicle.x - ride.x, dz = vehicle.z - ride.z;
@@ -732,7 +744,15 @@ function setupShot(label) {
     ui.setStars(heat);
     patrol.update(0.1, 3, hero, ride, barriers, null);
     for (let attempt = 0; attempt < 12 && patrol.cars.length < 3; attempt++) patrol.update(10, 3, hero, ride, barriers, null);
-    town.followHeli(ride, () => controls.yaw, { forward: 28, side: -18, height: 12.5 });
+    // Shot camera: default pitch 0.32 tilts the chase camera down ~29 deg, so the
+    // frame's top edge sits below horizontal and a helicopter at forward 17 /
+    // height 6.5 projects above the frame (only its light cone shows). Level the
+    // camera to pitch 0.05 so the helicopter lands in the upper frame, and shift
+    // it to side +5 so it clears the PIER 9 sign in chase (sign spans x -8.5..0.5).
+    controls.setPitch(0.05);
+    town.followHeli(ride, () => ride.heading, {
+      forward: 17, side: 5, height: 6.5, aimAtTarget: true,
+    });
     pinShot();
     fleetView.sync(motorists.cars, patrol.cars);
   }
