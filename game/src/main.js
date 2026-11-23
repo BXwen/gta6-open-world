@@ -480,8 +480,6 @@ function clearShotLane() {
     }
     return;
   }
-  if (laneCleared) return;
-  laneCleared = true;
   for (const vehicle of [...motorists.cars]) {
     const dx = vehicle.x - ride.x, dz = vehicle.z - ride.z;
     const forward = dx * Math.sin(ride.heading) + dz * Math.cos(ride.heading);
@@ -493,10 +491,9 @@ function pinShot() {
   if (!ride || ride.wrecked || !['chase', 'mission'].includes(shotPage)) return;
   ride.speed = Math.max(22, ride.speed);
   clearShotLane();
-  if (shotPage !== 'chase') return;
   patrol.cars.slice(0, 3).forEach((unit, index) => {
-    const ahead = index === 2 ? 13 : 27 + index * 12;
-    const side = index === 2 ? 12 : index === 0 ? -5 : 6;
+    const ahead = index === 0 ? 15 : index === 1 ? 16 : 21;
+    const side = index === 0 ? 4.4 : index === 1 ? -4.4 : -4.8;
     unit.x = ride.x + Math.sin(ride.heading) * ahead + Math.cos(ride.heading) * side;
     unit.z = ride.z + Math.cos(ride.heading) * ahead - Math.sin(ride.heading) * side;
     unit.heading = Math.atan2(ride.x - unit.x, ride.z - unit.z);
@@ -524,8 +521,8 @@ function aimCamera(delta) {
     controls.setYaw(controls.yaw + turn * Math.min(1, delta * 1.4));
   }
   const compact = ['chase', 'mission'].includes(shotPage);
-  const radius = driving ? compact ? 6.5 : 12.5 : 7.5;
-  const elevation = driving ? (compact ? 2.2 : 2.8) + controls.pitch * 4 : 1.55 + controls.pitch * 3.5;
+  const radius = driving ? compact ? 4.5 : 12.5 : shotPage === 'city' ? 5.2 : 7.5;
+  const elevation = driving ? (compact ? 2.0 : 2.8) + controls.pitch * 4 : (shotPage === 'city' ? 1.4 : 1.55) + controls.pitch * 3.5;
   const yawAngle = controls.yaw;
   const pitchAngle = controls.pitch;
   const desired = new THREE.Vector3(subject.x - Math.sin(yawAngle) * Math.cos(pitchAngle) * radius, Math.max(1.2, (hero.y || 0) + elevation + Math.sin(pitchAngle) * radius), subject.z - Math.cos(yawAngle) * Math.cos(pitchAngle) * radius);
@@ -725,7 +722,11 @@ function setupShot(label) {
     return;
   }
   if (label === 'city') {
-    town.followHeli(hero, () => controls.yaw, { forward: 28, side: 7, height: 4.2 });
+    relocate(4, 95);
+    hero.heading = 0;
+    controls.setYaw(0);
+    controls.setPitch(0.04);
+    town.followHeli(hero, () => controls.yaw, { forward: 22, side: -10, height: 7.8, yawOffset: 0.6 });
     return;
   }
   if (label === 'mission' || label === 'chase') {
@@ -733,8 +734,8 @@ function setupShot(label) {
       jobs.startMission(1, 1);
       maintainPrize();
     }
-    grantRide(label === 'mission' ? 0xe8c832 : 0x387bc2);
-    relocate(2, -120);
+    grantRide(label === 'mission' ? 0xe8c832 : 0xe86a2c);
+    relocate(2, 35);
     ride.heading = 0;
     ride.speed = 22;
     controls.setYaw(0);
@@ -751,7 +752,7 @@ function setupShot(label) {
     // it to side +5 so it clears the PIER 9 sign in chase (sign spans x -8.5..0.5).
     controls.setPitch(0.05);
     town.followHeli(ride, () => ride.heading, {
-      forward: 17, side: 5, height: 6.5, aimAtTarget: true,
+      forward: 15, side: -7.0, height: 7.5, yawOffset: 0.55, aimAtTarget: true,
     });
     pinShot();
     fleetView.sync(motorists.cars, patrol.cars);

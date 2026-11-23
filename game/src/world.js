@@ -643,7 +643,7 @@ function addAircraft(city) {
   const glass = surface(0x263f48, 0.48, { metalness: 0.04, emissive: 0x10191c, emissiveIntensity: 0.12 });
   mount(aircraft, cuboid(1.55, 1.05, 2.36), glass, [2.6, 0.24, 0]);
   const rotor = mount(aircraft, cuboid(12, 0.16, 0.42),
-    surface(0x29343a, 0.82, { transparent: true, opacity: 0.42 }), [0, 1.2, 0]);
+    surface(0x29343a, 0.82, { transparent: true, opacity: 0.75 }), [0, 1.2, 0]);
   mount(aircraft, cuboid(0.12, 2.2, 0.12), surface(0x29343a, 0.82), [-8.1, 0.8, 0]);
 
   const lamp = [0.35, -0.65, 0];
@@ -654,7 +654,7 @@ function addAircraft(city) {
     lamp[1] - Math.cos(beam.tilt) * beam.length / 2,
     lamp[2],
   ];
-  for (const [radius, facets, hue, opacity] of [[3, 24, 0xfff3c8, 0.35], [1.5, 20, 0xfff8df, 0.3]]) {
+  for (const [radius, facets, hue, opacity] of [[3, 24, 0xfff3c8, 0.48], [1.5, 20, 0xfff8df, 0.42]]) {
     mount(aircraft, cone(radius, beam.length, facets, 1, true), flat({
       color: hue, opacity, side: Three.DoubleSide, toneMapped: false, transparent: true, depthWrite: false,
     }), midpoint, { roll: beam.tilt });
@@ -682,6 +682,7 @@ function aviation(aircraft, rotor) {
       const ahead = offset.forward ?? 12;
       const lateral = offset.side ?? 0;
       const altitude = offset.height ?? 8;
+      const turn = offset.yawOffset ?? 0;
       chase = () => {
         const facing = yaw();
         const sine = Math.sin(facing);
@@ -689,7 +690,7 @@ function aviation(aircraft, rotor) {
         const east = target.x + sine * ahead + cosine * lateral;
         const south = target.z + cosine * ahead - sine * lateral;
         aircraft.position.set(east, altitude, south);
-        aircraft.rotation.y = facing;
+        aircraft.rotation.y = facing + turn;
       };
     },
     updateHeliFollow() {
