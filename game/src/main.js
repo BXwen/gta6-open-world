@@ -484,7 +484,7 @@ function clearShotLane() {
     const dx = vehicle.x - ride.x, dz = vehicle.z - ride.z;
     const forward = dx * Math.sin(ride.heading) + dz * Math.cos(ride.heading);
     const lateral = dx * Math.cos(ride.heading) - dz * Math.sin(ride.heading);
-    if (forward > -12 && forward < 110 && Math.abs(lateral) < 8) motorists.remove(vehicle);
+    if (forward > -2 && forward < 8 && Math.abs(lateral) < 1.8) motorists.remove(vehicle);
   }
 }
 function pinShot() {
@@ -492,13 +492,32 @@ function pinShot() {
   ride.speed = Math.max(22, ride.speed);
   clearShotLane();
   patrol.cars.slice(0, 3).forEach((unit, index) => {
-    const ahead = index === 0 ? 15 : index === 1 ? 16 : 21;
-    const side = index === 0 ? 4.4 : index === 1 ? -4.4 : -4.8;
+    const ahead = index === 0 ? 5.0 : index === 1 ? 5.8 : 10.5;
+    const side = index === 0 ? 3.2 : index === 1 ? -3.2 : -3.8;
     unit.x = ride.x + Math.sin(ride.heading) * ahead + Math.cos(ride.heading) * side;
     unit.z = ride.z + Math.cos(ride.heading) * ahead - Math.sin(ride.heading) * side;
-    unit.heading = Math.atan2(ride.x - unit.x, ride.z - unit.z);
+    unit.heading = ride.heading + (index === 0 ? -0.12 : index === 1 ? 0.12 : 0.05);
     unit.speed = 22;
   });
+  if (motorists.cars.length >= 3) {
+    const t0 = motorists.cars[0];
+    t0.x = ride.x + Math.sin(ride.heading) * 26 + Math.cos(ride.heading) * 3.6;
+    t0.z = ride.z + Math.cos(ride.heading) * 26 - Math.sin(ride.heading) * 3.6;
+    t0.heading = ride.heading;
+    t0.speed = 18;
+
+    const t1 = motorists.cars[1];
+    t1.x = ride.x + Math.sin(ride.heading) * 42 + Math.cos(ride.heading) * -3.4;
+    t1.z = ride.z + Math.cos(ride.heading) * 42 - Math.sin(ride.heading) * -3.4;
+    t1.heading = ride.heading;
+    t1.speed = 14;
+
+    const t2 = motorists.cars[2];
+    t2.x = ride.x + Math.sin(ride.heading) * -12 + Math.cos(ride.heading) * -3.6;
+    t2.z = ride.z + Math.cos(ride.heading) * -12 - Math.sin(ride.heading) * -3.6;
+    t2.heading = ride.heading;
+    t2.speed = 20;
+  }
 }
 function updateMedicine(delta) {
   for (const aid of firstAid) {
@@ -726,7 +745,7 @@ function setupShot(label) {
     hero.heading = 0;
     controls.setYaw(0);
     controls.setPitch(0.04);
-    town.followHeli(hero, () => controls.yaw, { forward: 22, side: -10, height: 7.8, yawOffset: 0.6 });
+    town.followHeli(hero, () => controls.yaw, { forward: 18, side: -3.5, height: 7.2, yawOffset: 0.5 });
     return;
   }
   if (label === 'mission' || label === 'chase') {
@@ -752,7 +771,7 @@ function setupShot(label) {
     // it to side +5 so it clears the PIER 9 sign in chase (sign spans x -8.5..0.5).
     controls.setPitch(0.05);
     town.followHeli(ride, () => ride.heading, {
-      forward: 15, side: -7.0, height: 7.5, yawOffset: 0.55, aimAtTarget: true,
+      forward: 14, side: -2.6, height: 4.8, yawOffset: 0.45, aimAtTarget: true,
     });
     pinShot();
     fleetView.sync(motorists.cars, patrol.cars);
